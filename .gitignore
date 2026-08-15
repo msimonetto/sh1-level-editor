@@ -1,0 +1,34 @@
+# Build output and IDE configurations
+/build/*
+.vscode/
+.vs/
+*.user
+__pycache__/
+*.py[cod]
+
+
+# Third-party libraries fetched via CMake FetchContent
+/libs/*
+
+# Game executables, PC Port source/binaries, and Disc Dumps
+/game/*
+/game/PC/*
+!/game/*.md
+!/game/PC/
+!/game/PC/.gitkeep
+/game/PSX/*
+!/game/PSX/
+!/game/PSX/.gitkeep
+
+# Game assets, dumps, and dynamic workspace data
+/data/assets/*
+!/data/assets/.gitkeep
+!/data/assets/*.md
+
+/data/temporary/*
+!/data/temporary/.gitkeep
+!/data/temporary/*.md
+
+/data/workspace/*
+!/data/workspace/.gitkeep
+!/data/workspace/*.md

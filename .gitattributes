@@ -1,0 +1,43 @@
+# Set default behavior to normalize text files to LF on checkout/commit
+* text=auto eol=lf
+
+# C / C++ Source and Headers
+*.c text diff=cpp eol=lf
+*.cpp text diff=cpp eol=lf
+*.h text diff=cpp eol=lf
+*.hpp text diff=cpp eol=lf
+*.rc text eol=lf
+
+# Python
+*.py text diff=python eol=lf
+
+# Documentation and Configuration
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ini text eol=lf
+CMakeLists.txt text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Shaders
+*.fs text eol=lf
+*.vs text eol=lf
+*.glsl text eol=lf
+
+# Binary files (prevent any line ending conversion or text diffing)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.bin binary
+*.cue binary
+*.tim binary
+*.plm binary
+*.ipd binary
+*.exe binary
+*.dll binary
+*.lib binary
+*.a binary
