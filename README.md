@@ -1,23 +1,32 @@
-# Silent Hill Level Editor
+# SH1 Level Editor <img src="./res/SHLE256.png" align="right" width="128px" height="128px" style="float: right; margin-left: 10px;" />
 
-A C++ 3D level editor, binary patcher and asset workstation for PlayStation 1 *Silent Hill* (1999) and its [PC Decompilation Port](https://github.com/SlickAmogus/silent-hill-decomp). The editor allows for intuitive conversion, inspection and modification of proprietary map formats (`.IPD`, `.PLM`, `.TIM`), binary overlays and room events data, while adhering to strict constraints imposed by the game engine and/or PSX hardware.
+> [!NOTE]
+> **This project is in early development!** Most features have not yet been implemented.
 
-Draws heavily from the research of prior decompilation projects, and byte-exact binary conversion cycle that was achieved using Python scripts in previous experimentation. AI assistance has been used for prototyping, diagnostics and rapid development of the C++ GUI, with code having been carefully reviewed and directed thoroughly by user input. The GUI is built with [Raylib](https://www.raylib.com/) and [Dear ImGui](https://github.com/ocornut/imgui), featuring chunk and binary overlay managers, dependency tracking, local geometry and texture mapping tools, a global object manager and more. Future implementation will cover all elements of Silent Hill 1 level design; this project is currently a **work-in-progress**.
+A C++ 3D geometry/level workstation for PlayStation 1 *Silent Hill* (1999) and its [unofficial PC Decompilation Port](https://github.com/SlickAmogus/silent-hill-decomp).
 
-![Demonstration3](./docs/images/Screenshot-Waypoints1.png)
+In its current state, proprietary chunk formats (`.IPD`, `.PLM`, `.TIM`) have been **successfully fully mapped out** and are **convertible** through either the dedicated ImGui editor or the included manual Python scripting. Recreating original game files byte-to-byte exact has been the core principle of this development, paving the way for in-memory editing that has been currently implemented. Modified chunk and texture data have successfully overridden game files in testing, and fully congruent to changes in the 3D editor. Elements of binary overlay data have been parsed and effective at producing valid C source files used by the PC Port, although most future extension will likely relate to binary overlay editing. The **2D Chunk Manager panel allows for effortless management and conversion of game files**, where name aliases can be set for obfuscated chunk names and a superimposed legend in the 3D Viewport maps these out clearly. Applications of this may exist for the ongoing effort in developing the PC Port and the overall decompilation project, and of course in modding.
 
-## Features & Capabilities
+Progress has been especially tied to the **ongoing decompilation project** for the exact structs and procedures used by the game engine, and additionally accelerated by the PC Port when testing for the requirements of valid chunk geometry. AI assistance has been fundamental for script prototyping, documentation, diagnostics and the rapid development of the C++ GUI, although code has been mostly reviewed and proofread with knowledge of the game engine, and each development step has been entirely user-supervised. I am hoping to rewrite this from the ground-up without AI assistance eventually.
 
-- **Asset Pipeline & Decomp Integration:** Automated toolchain for extracting game assets and deploying edits directly into the PC port override directories.
-- **3D Viewport:** Real-time rendering and manipulation of chunk geometry (`.IPD`), global models (`.PLM`), object placements, and collision meshes with interactive camera controls.
-- **Texture & TIM Manager:** Previewing, extraction, and palette (CLUT) inspection for PlayStation `.TIM` texture assets.
-- **Room Linkages & Event Editor:** Visual representation and editing of door waypoints (`s_MapPoint2d`), trigger volumes (AABB/OBB), map indices, and room transition events (`s_EventData`).
-- **IPD & Chunk Inspector:** Deep structural inspection and live editing of chunk headers, object matrices, positional groups, and other mapped out struct data.
+![Demonstration](./docs/images/Screenshot-LocalGeometry.png)
 
-![Demonstration1](./docs/images/Screenshot-LocalGeometry.png)
+---
 
+## Features
 
-## Current Limitations
+- _Viewport_: billboarded axis labels, legend, customisable controls and wireframe
+    - _Local Geometry_: faces (subdivision, extrusion, triangulation, gluing and UV mapping), vertices (adding faces, extrusion, removing duplicates), meshes (some rotation, mostly unimplemented), and instantiated global objects from PLM files (some rotation, positioning, duplication)
+    - _Collision_: viewer for collision walls, ramps, camera occlusion, subcell height map, only for IPD local geometry, editing will come later
+    - _Waypoints_: map-specific arrangements for doors (linkage to other rooms/maps), edits C source code for PC Port, untested in-game
+- _Chunk Manager_: 2D viewer for workspace and game override management, assigning aliases to chunks, dynamic file table patching when adding new objects
+- _Outliner_: lists meshes and global geometry objects
+- _Texture Map_: 2D selector for UV mapping, CLUT rows, texture file switching for selected faces, texture editing/importing will come later in a separate panel
+- _Maps_: currently minimal, works in tandem with Waypoints viewport mode
+
+---
+
+## Current Status
 
 - **Unimplemented PSX Support**: Only the PC Port has been integrated so far. No disc-image support currently exists, but this can be implemented relatively easily. Most of the engine patches (file table updates, waypoint data) are centered around replacing C source files (and indirectly DLLs) used by the PC Port. Conversion cycle back into binary overlays, alongside an alternate deployment routine would likely be necessary.
 - **Unimplemented Linux or macOS Support**: Currently only built around the Windows PC Port.
@@ -26,39 +35,19 @@ Draws heavily from the research of prior decompilation projects, and byte-exact 
 
 ---
 
-## Repository Structure
-
-```
-├── src/            # C++ implementation (core, viewports, panels, loaders)
-├── include/        # C++ header files and data structures
-├── docs/           # Reverse-engineering documentation, formats, and architecture
-│   ├── formats/    # Detailed binary specs (IPD, Collision, Overlays, JSON)
-│   ├── research/   # Verified FACTS.md and active HYPOTHESES.md
-│   └── ARCHITECTURE.md # Overview of C++ subsystems and classes
-├── scripts/        # Python asset extraction, conversion, and deployment toolchain
-│   ├── core/       # Format parsers and conversion models
-│   └── backend/    # Workspace management and decomp deployment helpers
-├── game/           # Target game directory (PC port/disc workspace; game/README.md)
-├── data/           # Local workspace data, extracted assets, and JSON representations
-    ├── assets/     # Extracted assets (geometry, textures, etc.) from BINs
-    ├── temporary/  # Temporary files, experiments, JSONs (regularly cleared)
-    └── workspace/  # Current workspace data (IPD, PLM, TIM), highly important
-└── tasks/          # Roadmap items, task logs, and implementation plans
-```
-
----
-
-## Building from Source
+## Setup
 
 ### Prerequisites
 - **CMake** (version 3.14 or newer)
-- **C++17 compliant compiler** (MSVC 2019+ via [Visual Studio Community](https://visualstudio.microsoft.com/downloads/) with Windows 10/11 SDK, MinGW-w64, GCC 9+, or Clang 10+)
-- **Python 3.8+** (required for asset extraction and conversion scripts, soon to be deprecated)
+- **C++17 compliant compiler** (MSVC 2019+ via [Visual Studio Community](https://visualstudio.microsoft.com/downloads/) with Windows 10/11 SDK, MinGW-w64, GCC 9+, or Clang 10+). Only MSVC has been tested in a clean virtual environment so far.
+- **Python 3.8+** (required for asset extraction and conversion scripts). Soon to be deprecated from core editor.
 - **Git** (required for dependencies and submodules)
 
 All C++ dependencies ([Raylib](https://github.com/raysan5/raylib), [Dear ImGui docking branch](https://github.com/ocornut/imgui), and [rlImGui](https://github.com/raylib-extras/rlImGui)) are automatically fetched and built by CMake via `FetchContent`.
 
-### Build Steps
+You can alternatively download executables from [Releases](https://github.com/msimonetto/sh1-level-editor/releases), embedded within folder structure and isn't entirely standalone given its use of Python scripts and management JSONs.
+
+### Building the Level Editor
 
 1. **Clone the repository:**
    ```bash
@@ -66,78 +55,36 @@ All C++ dependencies ([Raylib](https://github.com/raysan5/raylib), [Dear ImGui d
    cd sh1-level-editor
    ```
 
-2. **Configure with CMake:**
-   ```bash
-   cmake -S . -B build
-   ```
+2. **Configure with CMake and build the executable:**
+   - Initial clean configuration (with dependencies): `cmake -S . -B build`
+   - Incremental build: `cmake --build build` OR `ninja -C build`
 
-3. **Build the executable:**
-   ```bash
-   cmake --build build
-   ```
-
-   OR
-
-   ```bash
-   ninja -C build
-   ```
-
-4. **Launch the editor:**
-   - **Windows (MSVC):** `.\build\Release\SilentHillLevelEditor.exe`
-   - **Windows (MinGW / Ninja):** `.\build\SilentHillLevelEditor.exe`
-
-### Platform Support
-- **Windows (MSVC & MinGW):** Fully supported and verified.
-- **Linux & macOS:** Planned for future releases.
-
----
-
-## Game Setup & Workflow
+### Integrating PC Port
 
 > **Assets not included.** This repository does not contain any copyrighted game assets or executables. You must supply your own legal copy of *Silent Hill* (USA PS1 or PC port).
 
-### 1. Linking with the PC Port
 To playtest your level edits directly in the [PC Port](https://github.com/SlickAmogus/silent-hill-decomp):
 
-1. **Clone the PC Port into `game/PC/`**, initialize submodules, and build according to its instructions:
+3. **Clone the PC Port into `game/PC/`**, initialise submodules, and build according to its instructions:
    ```bash
    git clone https://github.com/SlickAmogus/silent-hill-decomp game/PC
    ```
 
-3. **Enable Loose Files Override:**
-   Edit the PC Port configuration (`game/PC/pc_port/build/config.cfg`) and set `allow_loose_files = 1`
+4. Edit the PC Port configuration (`game/PC/pc_port/build/config.cfg`) and set `allow_loose_files = 1` (and for diagnostic purposes, set `preload_chunks = 0` for in-game chunk reloading).
 
-4. **Provide Game Disc Data:**
-   Place a legally obtained copy of your Silent Hill 1 disc image (`SLUS-00707.bin` or `SLUS_007.07`) into:
+5. Place a legally obtained copy of your Silent Hill 1 disc image (`SLUS-00707.bin` or `SLUS_007.07`) into:
    `game/PC/pc_port/build/gamedata/SLUS-00707.bin`
 
-5. **Configure Editor Paths:**
+6. **Configure editor paths:**
    In the editor under **Edit $\rightarrow$ Settings** (or via `config.ini`):
    - **Project Directory:** Set to `data/` (or your preferred workspace path containing `workspace/` and `assets/`).
-   - **Game Directory:** Set to `game/` (points to `game/PC` and its `override/` directory for deploying level edits).
-
-### 2. Extracting & Managing Assets
-- Use the **Chunks Panel** inside the editor to extract, revert, and deploy chunks directly to the PC Port's override directories.
-- Alternatively, use the Python toolchain in `scripts/` (such as `python scripts/convert.py --help`) to inspect and convert `.IPD`, `.TIM`, and `.PLM` assets.
-
----
-
-## Documentation & Research
-
-Detailed technical documentation and reverse-engineering findings are maintained in [`docs/`](docs/):
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Comprehensive technical map of the C++ codebase.
-- [`docs/research/FACTS.md`](docs/research/FACTS.md) — Empirically verified binary data facts.
-- [`docs/research/HYPOTHESES.md`](docs/research/HYPOTHESES.md) — Active reverse-engineering hypotheses and open questions.
-- [`docs/formats/IPD.md`](docs/formats/IPD.md) — `.IPD` map chunk specification.
-- [`docs/formats/Collision.md`](docs/formats/Collision.md) — Heightfield and wall collision structure specification.
-- [`docs/formats/Binary Overlays.md`](docs/formats/Binary%20Overlays.md) — Memory overlay layouts and trigger data structures.
-- [`docs/formats/JSON.md`](docs/formats/JSON.md) — Intermediate JSON representation schemas.
+   - **Game Directory:** Set to `game/` (points to `game/PC` and its override directory for deploying level edits).
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please review [`CONTRIBUTING.md`](CONTRIBUTING.md) for our research principles (evidence hierarchy, decomp citations), asset copyright policies, and coding standards.
+Contributions are welcome. Please review [`CONTRIBUTING.md`](CONTRIBUTING.md) for research principles (evidence hierarchy, decomp citations, round-trip conversion). The project itself is fairly modular to allow for simultaneous development of new panels.
 
 ---
 
@@ -152,12 +99,10 @@ This project is licensed under the **GNU General Public License v3.0 (GPL-3.0-or
 - **[rlImGui](https://github.com/raylib-extras/rlImGui)** — Copyright © 2024 Raylib-Extras / Jeffery Myers (MIT License)
 - **[nlohmann/json](https://github.com/nlohmann/json)** — Copyright © 2013-2026 Niels Lohmann (MIT License)
 
-### Acknowledgments & Credits
-- **SlickAmogus** and **Vatuu** — *Silent Hill* PC port and PS1 decompilation projects (`silent-hill-decomp`) which serve as the foundation for engine logic and struct validation.
-- **belek666** — Author of `sh_ipd2obj`, whose early reference converter aided in initial geometry format validation. Used extensively in early research for converting IPD file format properly.
-- **Omar Cornut** and the Dear ImGui community for the immediate-mode GUI framework.
-- **Ramon Santamaria** and the Raylib contributors for the 3D graphics and rendering library.
-- The *Silent Hill* modding and reverse-engineering community.
+### Credits
+- [shdecompilations/silent-hill-decomp](https://github.com/shdecompilations/silent-hill-decomp) — Ongoing PS1 decompilation of Silent Hill.
+- [SlickAmogus/silent-hill-decomp](https://github.com/SlickAmogus/silent-hill-decomp) — Ongoing PC Port based on PS1 decompilation.
+- [belek666/sh_ipd2obj](https://github.com/belek666/sh_ipd2obj) — Local chunk data converter from `.IPD` to `.OBJ` with dependency tracking. Used extensively in early research for parsing and converting the IPD file format properly.
 
 ---
 
