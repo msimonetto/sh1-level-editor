@@ -471,8 +471,8 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
       std::string proj = Config::Get().ProjectDirectory;
       std::thread([&mgr, bin, out, proj]() {
         fs::path cwd = fs::current_path();
-        fs::path p1 = cwd / "tooling" / "1_bin_extractor" / "extract_assets.py";
-        fs::path p2 = cwd / ".." / ".." / "1_bin_extractor" / "extract_assets.py";
+        fs::path p1 = cwd / "scripts" / "backend" / "extract_assets.py";
+        fs::path p2 = cwd / ".." / "scripts" / "backend" / "extract_assets.py";
         std::string scriptPath = (fs::exists(p1) ? p1 : p2).string();
         mgr.Log("[EXTRACT] Executing python extract_assets.py for " + bin + "...");
         std::string cmd = "python \"" + scriptPath + "\" \"" + bin + "\" \"" + out + "\"";

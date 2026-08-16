@@ -1,45 +1,57 @@
-# Map-Specific Asset Pipeline & Formats
+# JSON Intermediate Formats & Offline Pipeline
 
-This document describes the intermediate JSON and image structures used to bridge the conversion between binary PlayStation files (`.IPD`, `.PLM`, `.TIM`) and workable 3D data formats (`.OBJ`, `.MTL`, `.PNG`).
+> [!NOTE]
+> **Status:** The C++ Level Editor operates directly on native binary PlayStation files (`.IPD`, `.PLM`, `.TIM`) in memory. Intermediate JSON files are no longer required for active editor workflows, but the standalone Python pipeline (`scripts/convert.py`) continues to provide full, lossless JSON round-tripping for manual inspection, debugging, and external 3D DCC tools (e.g. Blender).
 
-The workflow operates on a **2-Tier Map-Specific Decoupling System** designed to minimize file size, remove duplicate geometry, mirror the game's actual VRAM loading lifecycle, and provide lossless visual editing for textures.
+---
 
-## 1. Map-Specific Global Assets (`[PREFIX]_GLB.json`)
-**Purpose**: The central dictionary of all geometry and texture assets parsed from the binary `_GLB.PLM` and `.TIM` files for a specific map prefix (e.g., `THR_GLB.json`).
-- Replaces the deprecated monolithic `master_assets.json`.
-- Accurately mirrors PS1 DMA loading: assets are scoped only to their relevant map area, eliminating artificial naming collisions (e.g., prepending `THR_` to object names).
-- Serves as the ultimate source of truth for global meshes loaded during a specific map's session.
+## 1. Intermediate JSON Specifications
 
-## 2. Local Chunk Assets (`[CHUNK].json`)
-**Purpose**: The direct, lightweight serialized representation of a single `.IPD` file (e.g., `THR0000.json`).
-- Stripped of all global geometry arrays.
-- Contains localized data unique to the chunk:
-  - Header offsets.
-  - Placement coordinates (Euler rotations, fixed-point translations).
-  - Object Flags (`glb_flag`).
-  - Polygon data including exact `cba` VRAM coordinates (for CLUT selection) and `unk2` transparency flags.
-- Enables perfectly lossless, byte-for-byte backwards conversion back to the binary `.IPD` structure.
+### A. Local Chunk Assets (`[CHUNK].json`)
+The serialized representation of an individual `.IPD` file (e.g., `THR0000.json`):
+- **Header & Offsets:** Preserves chunk identification (`x_pos`, `y_pos`) and section offset metadata.
+- **Object Hierarchy:** Stores `IPD_POS_HEADER` groups and `IPD_OBJ_DATA` instances (Euler rotations, fixed-point translations, `glb_flag`, `mesh_id`).
+- **Embedded Geometry:** Serializes local PLM polygon records, vertex tables, UVs, raw `cba` (CLUT VRAM coordinates), and `unk2` (STP transparency flag).
+- **Embedded Collision:** Serializes subcells, split vertices, surface planes, and broadphase grids when present.
 
-## 3. Lossless Texture & CLUT Storage
-To preserve the 15-bit RGB + 1-bit STP (Semi-Transparency) data while remaining visually editable in modern tools like Aseprite, `.TIM` files are split into two companion `.png` files rather than baked into a single lossy 32-bit `.TGA`.
+### B. Map Global Assets (`[PREFIX]_GLB.json`)
+The dictionary of shared level geometry and textures extracted from `_GLB.PLM` and related `.TIM` files for a given map prefix (e.g., `THR_GLB.json`):
+- Groups global prop meshes referenced by local chunks when `glb_flag == 1`.
+- Scopes texture names and mesh IDs per map stage without monolithic asset duplication.
 
-### A. The Image Data (`[texture_name].png`)
-- **Format:** 8-bit Indexed PNG.
-- **Content:** Contains raw pixel indices (0-15 or 0-255).
-- **Visuals:** Embeds **CLUT #0** as its internal palette for correct visual rendering. Index `0x00` (transparent mask) has its Alpha channel set to 0.
-- **Editing:** Editable in Aseprite; saving updates the raw pixel indices without modifying color data.
+### C. Room Linkage Overlays (`[MAP].json`)
+Located in `data/workspace/overlays/`, these represent decompiled map event headers (`header_field_D2C.h` / `map_points.h`):
+- Stores arrival waypoints, door links, trigger volumes (AABB, OBB, radius), and destination map state indices.
 
-### B. The Palette Data (`[texture_name]_cluts.png`)
-- **Format:** 32-bit TrueColor RGBA PNG.
-- **Content:** Each row of pixels represents one CLUT variant from the original `.TIM`.
-- **Transparency Mapping:** The PS1 STP bit is mapped to the Alpha channel:
-  - `0x0000` (Black, STP 0) $\rightarrow$ `RGBA(0, 0, 0, 0)` (Mask)
-  - `0x8000` (Black, STP 1) $\rightarrow$ `RGBA(0, 0, 0, 128)` (Semi-transparent Black)
-  - RGB, STP 0 $\rightarrow$ `RGBA(R, G, B, 255)` (Opaque)
-  - RGB, STP 1 $\rightarrow$ `RGBA(R, G, B, 128)` (Semi-transparent)
-- **Editing:** Can be opened in image editors to physically paint or tweak palette colors. The script converts these RGBA values perfectly back to 16-bit PS1 colors.
+---
 
-## 4. Polygon Rendering (OBJ/MTL)
-- Polygons no longer bake CLUTs into a massive TrueColor texture.
-- `.OBJ` files map directly to the base `[texture_name].png`.
-- The `cba` value (CLUT offset) and `unk2` (STP flag) are preserved in the `.json` and passed into the `.OBJ` (via custom UV maps or vertex colors), allowing custom shaders to replicate the PS1 rendering dynamically.
+## 2. Dual-PNG Texture Architecture
+
+To preserve PS1 15-bit RGB + 1-bit STP (Semi-Transparency) data without lossy 32-bit baking, `.TIM` files convert into paired PNG files:
+
+1. **Indexed Image (`[name].png`):** 8-bit indexed PNG holding raw pixel indices (0–15 or 0–255), previewed with CLUT #0.
+2. **Palette Strip (`[name]_cluts.png`):** 32-bit RGBA PNG where each horizontal row represents one 16-color CLUT variant:
+   - `0x0000` (STP 0) $\rightarrow$ `RGBA(0, 0, 0, 0)` (Masked Transparent)
+   - `0x8000` (STP 1) $\rightarrow$ `RGBA(0, 0, 0, 128)` (Semi-transparent Black)
+   - RGB (STP 0) $\rightarrow$ `RGBA(R, G, B, 255)` (Opaque)
+   - RGB (STP 1) $\rightarrow$ `RGBA(R, G, B, 128)` (Semi-transparent)
+
+---
+
+## 3. Standalone Python CLI (`scripts/convert.py`)
+
+Manual bidirectional conversions are executed via the modular CLI:
+
+```bash
+# IPD <-> JSON
+python scripts/convert.py ipd-to-json <file.IPD> [-a <assets_dir>]
+python scripts/convert.py json-to-ipd <file.json> [-o <out.IPD>]
+
+# PLM <-> JSON
+python scripts/convert.py plm-to-json <file.PLM>
+python scripts/convert.py json-to-plm <file.json> [-o <out.PLM>]
+
+# TIM <-> PNG
+python scripts/convert.py tim-to-png <file.TIM> <out_dir>
+python scripts/convert.py png-to-tim <indexed.png> <cluts.png> <out.TIM>
+```

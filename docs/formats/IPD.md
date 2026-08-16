@@ -2,7 +2,7 @@
 
 Structures and layouts for `.IPD`, `.PLM`, and `.TIM` files. Entries are marked **[Confirmed]** (byte-exact roundtrip or decompiled source) or **[Provisional]** (consistent with observed data, not yet code-verified).
 
-For collision data, see [`COLLISION_FORMAT.md`](COLLISION_FORMAT.md). For intermediate JSON/PNG formats, see [`JSON_PIPELINE.md`](JSON_PIPELINE.md).
+For collision data, see [`Collision.md`](Collision.md). For intermediate JSON/PNG formats, see [`JSON.md`](JSON.md).
 
 ## IPD (.IPD) Map Format
 
@@ -71,7 +71,7 @@ The game uses standard PlayStation `.TIM` files (15-bit RGB palette + 1 transpar
 - UVs map 1:1 to external `.TIM` files. The IPD determines the bounds (u,v) and palette (CLUT), but the TIM files hold the uncompressed indexed pixel data.
 
 ### Validation
-- **Extraction Match:** `ipd_to_obj.py` generates geometry, MTLS, and TGA texture maps byte-for-byte identical to the original C parser.
+- **Extraction Match:** `ipd_to_obj.py` generates geometry, MTLS, and TGA texture maps byte-for-byte identical to the original C parser. (dubious claim, OBJ conversion was lossy)
 - **Normal Boundaries:** Safely bypasses segmentation faults found in the original tools when parsing incomplete/padded normal clusters.
 
 ### References
@@ -85,7 +85,7 @@ The game uses standard PlayStation `.TIM` files (15-bit RGB palette + 1 transpar
 
 When creating a *new* IPD from scratch (rather than round-tripping an existing one), several areas require dynamic calculation rather than static copying:
 
-- **Collision payload** (`s_IpdCollisionData`): Must be built from structured JSON (subcells, surfaces, split vertices) — not preserved as an opaque hex blob. See `COLLISION_FORMAT.md` for the full struct layout.
+- **Collision payload** (`IPD_COLL_HEADER`): Defines subcells, surfaces, and split vertices embedded at offset `0x54`. See [`Collision.md`](Collision.md) for the full struct layout.
 - **`unk2_offset` blocks**: Must be recalculated per object group after any geometry insertion. Their size is always exactly 8 bytes per group.
 - **PLM alignment padding**: PLM sections must be padded to 4-byte boundaries dynamically based on the new geometry count, not by copying static `0x0000` gaps.
 - **`obj_data_offset` and `obj_name_offset`**: Both are dynamic and must be recalculated when object counts change.

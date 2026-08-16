@@ -94,7 +94,7 @@ public:
   void RebuildChunkBatches(const std::string &chunkName,
                            const std::string &workspaceDir);
 
-  int m_moveStepPower = 0;
+  int m_moveStepPower = 4;
   bool m_autoValidate = true;
 
   void DrawOverlay(Viewport &vp) override;
