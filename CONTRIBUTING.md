@@ -1,118 +1,99 @@
-# Contributing to Silent Hill Level Editor
+# Contributing
 
-Thank you for your interest in contributing to the **Silent Hill Level Editor**. This project is an interactive C++ level editor and asset toolkit for PlayStation 1 *Silent Hill* (1999) disc extracts and level data. Initial tests have proven successful, where actual data has been manipulated and viewable in-game, and file formats have been understood better. Contributions are highly encouraged, there is still major progress to be done before the editor is fully furnished. The editor can be assistive to the development of the PC Port for event handling, camera positions and so forth.
+Contributions are more than welcome. The editor is in a solid position to be furnished in its capability of editing chunk data and binary overlays. Currently, the repository name is a slight misnomer since most capability is in geometry editing rather than full level design, but I aim to shift attention over to map/level-specific elements in the forseeable future.
 
-Contributions would mainly relate to the creation of unimplemented level features (Enemy placement, Audio trigger points, Map-specific parameters, etc), otherwise it would likely involve adding/fixing Python asset tools, or contributing further to existing documentation for file formats / research.
+As of August 2026, there are many unimplemented features: editing collision geometry, enemy placement, audio emission/trigger points, and other map-specific parameters, and so forth. Research needs to be updated further. Most specific modules/elements that are being worked on have their own task in `tasks/`, which I will widen in the near future. The history and the current state of development is outlined on [README.md](README.md), and partially on the [changelog](CHANGELOG.md). The bottom line is that component-specific progress is documented in greater detail in the `tasks/` folders, and many of these can be developed individually.
 
-**Context and Past Development**: As of August 2026, I have worked on this project almost continuously for two months, working on IPD/PLM parsing + reconstruction and later many elements of the application's GUI frontend. I previously held most of my development in a private repository containing extensive but messy research on file formats. I am working on summarising everything in documentation here. The software itself is quite extendable and source code is abstracted well enough to accomodate for that. I'm open to hear and discuss suggestions so don't be afraid to reach out.
+Additionally, this repository may seem to have appeared out thin air, but I have a (now deprecated) repository `sh1-level-editor-research` that's been kept private due to its presence of game extracts and data-containing JSONs. That had about 150 commits. I had also done research continuously for about 1-2 months before that on file formats before I produced successful conversion tools.
 
-**AI Use**: AI has been used extensively in early prototyping, proprietary format parsing and rapid development of the GUI. You are welcome to use AI equivalently. For starters, there are many unnamed functions, enums, structs and file formats that are difficult to reverse-engineer. Known data types and structs are mapped out and understood fairly well, but there are still a multitude of unexplored file formats. Logical consistency can be hard to maintain manually, especially when trying to rapidly develop projects like these. I've used Gemini 3.1 Pro, Gemini 3.6/3.7 Flash, and Claude Sonnet 4.6/5 all within Antigravity IDE, and found that these were more than sufficient for both development and diagnostics. Documentation should be reviewed manually. Just make sure to work through goals incrementally, and use your awareness of the game engine and/or the PC Port to guide judgement.
-
----
-
-## 1. Guiding Principles & Research Methodology
-
-To maintain accuracy and data integrity across reverse-engineered PlayStation 1 formats, all contributions must adhere to these core principles:
-
-### Evidence Hierarchy
-When documenting binary structures or implementing parsers/serializers, prioritize evidence in the following order:
-1. **Decompiled Engine Source:** Verified source code and symbols from decompilation efforts (e.g. `game/PC/` and upstream [`silent-hill-decomp`](https://github.com/SlickAmogus/silent-hill-decomp)).
-2. **Empirical Binary Tests:** Byte-exact round-trip validation and cross-file verification across multiple official retail map chunks.
-3. **Reference Tools & Converters:** Empirically verified community tools (e.g. `belek666/sh_ipd2obj`).
-4. **Community Notes & Theories:** Helpful for context, but must be empirically tested before being treated as authoritative.
-
-### Byte Precision & Round-Trip Validation
-Parsers and serializers must preserve data integrity. A fundamental rule of this project is that converting an asset forward and then back must yield a bit-identical or fully specification-compliant file. Always verify round-trip integrity (via SHA256 checksums or hex diffs) when modifying conversion logic in `IPDWrite` or `scripts/core/`.
-
-### Documenting Research
-- **Confirmed Facts:** Empirical discoveries backed by decompiled code or byte-exact tests must be added with citations to [`docs/research/FACTS.md`](docs/research/FACTS.md).
-- **Hypotheses & Open Questions:** Unproven theories, candidate struct layouts, or speculative flags belong in [`docs/research/HYPOTHESES.md`](docs/research/HYPOTHESES.md) until verified.
+I'm open to discuss any concerns or suggestions, and I'm happy to debrief in more detail. You can contact me via the email given on my profile. I'm busy with university at the moment but I will try my best to respond.
 
 ---
 
-## 2. Asset & Copyright Policy
+## Overview of development principles
+
+### Conversion tools
+- Development should be mostly research-based, pulling evidence from documentation kept in this repository or externally from the decompilation projects.
+- In working with conversion scripts, you should aim to develop both forwards and backwards conversion scripts, and as a bottom line should produce byte-to-byte exact files to their original form. Making use of Hex editors is highly recommended, especially when diagnosing problems with struct/header recognition. development.
+- In terms of backwards conversion, JSON files are recommended as an intermediate step, and ensure raw binary sections are minimised/removed when converting to-from that intermediate form. Naturally, that wouldn't apply to media-related raw data.
+
+### Documenting research
+- Empirical discoveries backed by decompiled code or byte-exact tests must be added with citations to [`docs/research/FACTS.md`](docs/research/FACTS.md). Unproven theories or speculative fields belong in [`docs/research/HYPOTHESES.md`](docs/research/HYPOTHESES.md) until verified. These files are outdated and will be updated precisely.
+- Task-specific research should be integrated into `tasks/`, and if meaningful should be brought into `docs/research/` when the task is fulfilled.
+
+### Adhering to constraints of game engine
+PS1-specific requirements are easy to overlook and haven't been fully documented. This was a critical factor when deciding to develop an independent level editing program in C++, as scripting everything manually in Blender Python API was buggy and prone to crashes, or even in Unity given the need for custom bitfields and floating-point arithmetic here.
+
+- 3D editing operates in floating-point world coordinates (1 game unit = 256 raw units), but all geometry must cleanly quantize to signed 16-bit integers (`int16_t`) on disk for Q19.12 coordinates.
+- Max 255 vertices per submesh, 16-unit max height, 40-unit chunk cell boundaries, enforced by `ChunkValidator`. There are also height constraints above/below.
+- See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full C++ component map and class index before making structural changes. Update it if adding or removing callable classes or panels.
+
+### Level editor
+- Panels and viewport modes should be modular to existing structures. Extensibility is critical to this editor. Especially in the context of AI GUI development, it might require taking a step back to inspect what can be abstracted, as AI tends to work towards the path of least resistance for the specific feature you're implementing. It's also nice to standardise features and the validation measures across viewports.
+- After successfully writing conversion scripts that maintain round-trip accuracy, you should aim to translate that into C++ code for chunk and/or binary data to be held in memory. Manually running Python scripts and reading/writing JSONs will massively reduce performance per face/vertex operation.
+- Unknown and unparsed blocks should be held and preserved in memory, and dynamically move where necessary to prevent corruption.
+- Constraints should be interactively maintained or checked (with indication) in the editor.
+- A file table patcher should be employed to ensure game file positions (in minutes/hours) expand dynamically across the entire disc image.
+- Proprietary structures should be visualisable before they are editable. An example of this is through chunk-specific collision and boundary data, containing 2.5D collision subcells or camera occlusion angles that can often be more complex than actual geometry data. This took some effort to produce visualisation that appeared within reason.
+- Separating folders into the original clean assets (`data/assets/`), working project files (`data/workspace`), and resultant game deployment overrides (`game/PC/...`) or the disc image location, is critical. Temporary folders for experimentation or diagnostics should be kept separately.
+
+---
+
+## Game assets
 
 > [!CAUTION]
 > **Do not commit copyrighted game assets.**  
 > Never submit pull requests or commits containing original retail game files, PlayStation disc ISOs, raw `.IPD`/`.PLM`/`.TIM`/`.BIN` extracts from commercial discs, or copyrighted game audio/textures.
 
-- Contributors must provide their own legally acquired copy of *Silent Hill* for development and testing.
-- All extracted game data must remain in local workspace directories (`data/workspace/`, `data/assets/`, `data/temporary/`, `game/`), which are ignored by `.gitignore`.
+Contributors must provide their own legally acquired copy of *Silent Hill* for development and testing. All extracted game data must remain in local workspace directories (`data/workspace/`, `data/assets/`, `data/temporary/`, `game/`), which are ignored by `.gitignore`.
 
 ---
 
-## 3. Codebase Architecture
+## Immediate steps from the current state
 
-- **`src/` & `include/`:** The unified C++ application built on **C++17**, [Raylib](https://www.raylib.com/) (3D rendering and windowing), [Dear ImGui](https://github.com/ocornut/imgui) (docking branch), and [rlImGui](https://github.com/raylib-extras/rlImGui).
-  - `core/`: Engine logic, binary parsers (`IPDParse`, `IPDWrite`), undo/redo history (`History`), asset managers, and configuration.
-  - `geometry/`: Low-level mesh manipulation, topology editing, and PS1 hardware limits validation (`ChunkValidator`).
-  - `panels/`: ImGui UI windows (Chunk manager, Dependencies manager, Texture Map, Local Geometry tools, Waypoints inspector, Outliner, Settings).
-  - `viewport/`: 3D viewports, orbit camera controls, frustum culling, wireframes, and multi-mode overlays (`LocalGeometryOverlay`, `CollisionOverlay`, `WaypointsOverlay`).
-- **`scripts/`:** Python toolchain for asset extraction, format conversion, and decompilation bridge:
-  - `scripts/core/`: Format parsers (`ipd_parser.py`, `plm_parser.py`, `tim_to_png.py`, `png_to_tim.py`, `json_to_obj.py`).
-  - `scripts/backend/`: Lean CLI entry points invoked natively by C++ `AssetManager` (`chunk_extractor.py`, `deploy_workspace.py`, etc.).
-  - `scripts/convert.py`: Unified CLI dispatcher for standalone conversions.
-- **`tasks/`:** Task-based development workflow. [`tasks/FullEditor/TASK.md`](tasks/FullEditor/TASK.md) serves as the master task channel coordinating overarching features and linking to specialized sub-tasks (`Dependencies/`, `GlobalObjects/`, `Waypoints/`, `BinaryOverlays/`, `Audio/`, `ContextMenus/`).
-- **`docs/`:** Technical documentation and reverse-engineering research:
-  - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): Authoritative C++ component map, class index, and method reference.
-  - [`docs/AI Guidance.md`](docs/AI%20Guidance.md): Operational guidelines and behavioral rules for AI assistants and contributors.
-  - [`docs/formats/`](docs/formats/): Byte-level binary format specifications (`IPD.md`, `Collision.md`, `Binary Overlays.md`, `JSON.md`).
-  - [`docs/research/`](docs/research/): Proven discoveries (`FACTS.md`) and working hypotheses (`HYPOTHESES.md`).
+### Research
+- Researching unknown/unparsed file formats such as `.TMD`, `.CMP` (potentially), `.KDT`.
+- Researching unknown components of binary overlays.
+- Updating documentation to reflect recent developments in file formats and binary overlay analysis from decompilation project.
+
+### Python scripting
+- Migrating remaining Python script logic into C++, namely those surrounding file management or reading/writing dependency JSONs.
+- Allow for user-made scripts with automatically furnished interface.
+
+### Chunk-specific features
+- Integrating a user-editable dependency tracker, which is currently a stub.
+- Adding a texture editing viewport to directly update `.TIM` files, allow for import/export and custom files.
+- Adding editing to collision data/viewport, should ideally make use of orthogonal 2D overhead view for collision walls.
+- Gizmos for moving/rotating that adhere to game constraints.
+- Editing geometry/UV mapping in global object files (`.PLM`).
+
+### Map-specific features
+- Editing binary overlay data directly for original PSX extracts, instead of exclusively through the C source code. May require some Python parsing at first.
+- Visualising enemy placement.
+
+### Miscellaneous
+- For playtesting purposes, allowing the launch of the PC Port from the 
+- A list of 100+ unimplemented minor features/fixes are specified in [Suggested Improvements.md](tasks/FullEditor/Suggested%20Improvements.md) from user testing.
 
 ---
 
-## 4. Development & Coding Standards
-
-### C++ Guidelines
-- Target **C++17**.
-- **Modularity:** Keep files focused and readable (aim for source files under 1000 lines where practical). Split complex UI panels and geometry routines into specialized modules.
-- **PS1 Scale & Coordinate Quantization:** 3D editing operates in floating-point world coordinates ($1\text{ unit} = 256\text{ raw units}$), but all geometry must cleanly quantize to PlayStation signed 16-bit integers (`int16_t`) on disk to prevent rasterizer seams.
-- **Hardware Constraints Validation:** Ensure all new geometry tools respect PlayStation limits (max 255 vertices per submesh, 16-unit max height, 40-unit chunk cell boundaries) as enforced by `ChunkValidator`.
-- **Memory & Resource Safety:** Use RAII, smart pointers, and standard library containers. Avoid raw memory leaks across texture loads and GPU batch allocations.
-
-### Python Guidelines
-- Target **Python 3.8+**.
-- Use pure-Python standard libraries (`struct`, `json`, `pathlib`, `argparse`) wherever possible to keep dependencies lightweight.
-- Ensure all conversion scripts support deterministic round-trip output.
-
-### Keeping Documentation in Sync
-- **Architecture Updates:** If your change adds, modifies, or removes callable classes, methods, panels, or viewports, update [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-- **Task Logs:** When working on a feature, update the relevant `tasks/[Task]/TASK.md` and `TODO.md`. Once fully complete, append a summary line to [`CHANGELOG.md`](CHANGELOG.md).
-
-### Building & Testing
-Before submitting changes, verify that the project builds and runs cleanly:
+## Building and testing
 
 ```bash
-# Configure build directory
 cmake -B build
-
-# Build in Release mode (MinGW / MSVC / GCC)
-cmake --build build --config Release
+cmake --build build
 ```
 
-1. **GUI & Viewport Verification:** Launch the built executable (`build/SilentHillLevelEditor.exe`) and test viewport navigation, mode switching, chunk loading, and tool interaction without crashes or memory corruption.
-2. **Conversion Script Testing:** If modifying Python tools, verify both forward and reverse conversions:
+1. Launch `build/SilentHillLevelEditor.exe` and verify viewport navigation, chunk loading, and tool interaction without crashes.
+2. If modifying Python tools, verify both directions. Ensure that these are placed in excluded directories such as `data/temporary/` of the project:
    ```bash
    python scripts/convert.py ipd-to-json <sample.ipd> -o <output.json>
    python scripts/convert.py json-to-ipd <output.json> -o <rebuilt.ipd>
    ```
-3. **Commit Cleanliness:** Confirm no copyrighted game files, build artifacts, or temporary logs are staged.
+3. Confirm no copyrighted game files, build artifacts, or temporary logs are staged.
 
 ---
 
-## 5. Submitting Changes
+## Discussion
 
-### Pull Requests
-1. **Branch Naming:** Create a focused feature branch off `main` (e.g. `feature/door-spline-gizmo`, `fix/plm-matrix-quantization`, `docs/ipd-collision-flags`).
-2. **Descriptive Commits:** Write concise commit messages explaining *what* was changed and *why*.
-3. **PR Summary:** Describe the problem solved, the technical implementation, and step-by-step instructions to verify the changes.
-4. **Clean Diff:** Double-check that your PR does not accidentally include temporary files (`data/temporary/`, `scripts/temporary/`), build folders (`build/`), or proprietary game assets.
-
-### Reporting Issues & Format Discoveries
-- **Bug Reports:** Open a GitHub Issue detailing your OS, compiler/environment, steps to reproduce, and any relevant console logs.
-- **Format Corrections:** If proposing corrections to binary structures or struct layouts, include relevant hex offsets, sample file context, or decompiled code references.
-
----
-
-## 6. Questions & Discussions
-For feature suggestions, architecture questions, or reverse-engineering discussions, feel free to open a GitHub Issue or Discussion thread.
+For feature suggestions, bug reports, architecture questions, or reverse-engineering discussions, open a GitHub Issue or Discussion thread. For format corrections, include evidence (relevant hex offsets), sample file context, or decompiled code references.
