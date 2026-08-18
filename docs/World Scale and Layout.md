@@ -28,14 +28,14 @@ It is crucial to differentiate what the player *sees* from what the engine *coll
 
 ## 4. Components of a Map Overlay
 
-Looking at `map7_s02` (Nowhere) as an example, a full map overlay in Silent Hill 1 is composed of several discrete logic files. To inject a fully functional custom map, we will need to generate or define these components:
+Looking at `map7_s02` (Nowhere) as an example, a full map overlay in Silent Hill 1 is composed of several discrete logic files. For the complete `s_MapOverlayHdr` struct specification and custom map authoring workflow, see [`Map Overlay System.md`](Map Overlay System.md) and `tasks/BinaryOverlays/notes.md`.
 
-- **`header_field_D2C.h`**: The trigger zones. Defines where raised floors, platforms, and steps are.
-- **`map_points.h`**: Points of Interest (POIs). Used to define exact coordinates for door transitions and event triggers.
-- **`vc_road_data.h`**: Camera data. Dictates the bounds and behavior of the game's dynamic camera system for the map.
-- **`chara_spawns.h`**: Spawn configurations dictating what enemies load in the room.
-- **`[map_name]_events_data.c`**: The scripted logic for the area, linking door items, dialogue, and unlocking mechanics.
-- **`Chara_[Name].c`**: Per-map specific behavior overrides for NPCs or monsters in the area.
+- **`header_field_D2C.h`**: Step-height elevation AABBs (`s_CollisionTrigger`). Defines where raised floors, platforms, and steps are.
+- **`map_points.h`**: Waypoints (`s_MapPoint2d`). Defines 2D coordinates for door transitions and event trigger positions.
+- **`vc_road_data.h`**: Camera paths (`VC_ROAD_DATA`). Dictates the bounds and behavior of the game's dynamic camera system.
+- **`chara_spawns.h`**: Enemy spawn configurations (`s_SpawnInfo`).
+- **`[map_name]_events_data.c`**: Event triggers (`s_EventData`) and scripted logic linking doors, dialogue, and unlocking mechanics.
+- **`Chara_[Name].c`**: Per-map AI behavior overrides for NPCs or monsters.
 
 ## 5. Script-to-Collision Interaction
 

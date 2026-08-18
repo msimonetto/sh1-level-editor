@@ -1,6 +1,6 @@
 # IPD Naming Conventions
 
-This document outlines the conventions used for naming `.IPD` (map/world geometry) files in the game. Based on analysis of the `data/original/complete` directory and the game's file table, the filenames follow a strict structural pattern that denotes both the **logical map location** and the **relative chunk coordinates**.
+This document describes the naming convention for `.IPD` (map/world geometry) files. The convention is **engine-enforced**: `Map_MakeIpdGrid` in the PC port decomp scans filenames with this exact pattern to build the spatial chunk grid at runtime. Filenames follow a strict structural pattern that denotes both the **local map location** (prefix) and the **relative chunk coordinates** (last four characters).
 
 ## File Name Structure
 
@@ -26,21 +26,21 @@ The map chunks are organized in a 2D grid relative to a logical center `(0, 0)`.
 
 The 2- or 3-letter prefixes correspond to specific locations in Silent Hill. The suffix **`U`** generally stands for **"Ura"** (Japanese for Reverse/Alternate), denoting the Nightmare version of a location.
 
-| Prefix | Count | Location Hypothesis | Confidence / Notes |
+| Prefix | Count | Location | Notes |
 | :--- | :--- | :--- | :--- |
-| **`THR`** | 128 | Old Silent Hill (Town) | **High**: Covers the expansive outdoor town map (beginning of the game). Does not include Central Silent Hill. |
-| **`SC`** | 42 | Midwich Elementary School (Normal) | **High**: The chunks are structurally disconnected from each other. |
-| **`SU`** | 40 | Midwich Elementary School (Alternate) | **High**: "School Ura". Matches `SC` perfectly in size, also heavily disconnected. |
-| **`HP`** | 20 | Alchemilla Hospital (Normal) | **High**: Standard mapping. |
-| **`HU`** | 58 | Alchemilla Hospital (Alternate) | **High**: "Hospital Ura". Alternate hospital is notoriously larger/more complex. |
-| **`RSR`** | 27 | Resort Area (Normal) | **High**: Covers the Resort Area outdoors. |
-| **`RSU`** | 23 | Resort Area (Alternate) | **High**: "Resort Ura". Includes textures for the Lighthouse (`RSULH*`) and Boat. |
-| **`DR`** | 17 | Sewers (Drainage) | **High**: Matches the path to the Resort Area. |
-| **`DRU`** | 6 | Sewers (Alternate / Part 2) | **Medium**: Likely the second section of the sewers or a darker variant. |
-| **`APU`** | 9 | Amusement Park (Alternate) | **High**: "Amusement Park Ura". The park is only visited in the Alternate world. |
-| **`SPR`** | 32 | Central Silent Hill (Town Center) | **High**: Confirmed to be Central Silent Hill. |
-| **`SPU`** | 33 | Alternate Central Silent Hill | **High**: Alternate Central Silent Hill (including the alternate shopping center). |
-| **`ER`** | 58 | Event / Extra Rooms (Interiors) & Nowhere | **High**: Contains isolated interiors like the Balkan Church (`ER_CHRC`), School Bus (`ER_BUS`), Norman's Motel (`ER_MT*`), and Annie's Bar/Billiards (`ER_BILL`). Confirmed to contain rooms from "Nowhere" (e.g., the puzzle room with names/ages) which replace existing spaces in-game. |
+| **`THR`** | 128 | Old Silent Hill (Town) | Covers the expansive outdoor town map. Does not include Central Silent Hill. |
+| **`SC`** | 42 | Midwich Elementary School (Normal) | Chunks are structurally disconnected from each other. |
+| **`SU`** | 40 | Midwich Elementary School (Alternate) | "School Ura". Matches `SC` in chunk count, also heavily disconnected. |
+| **`HP`** | 20 | Alchemilla Hospital (Normal) | Standard mapping. |
+| **`HU`** | 58 | Alchemilla Hospital (Alternate) | "Hospital Ura". Alternate hospital is larger/more complex. |
+| **`RSR`** | 27 | Resort Area (Normal) | Covers the Resort Area outdoors. |
+| **`RSU`** | 23 | Resort Area (Alternate) | "Resort Ura". Includes textures for Lighthouse (`RSULH*`) and Boat. |
+| **`DR`** | 17 | Sewers (Drainage) | Matches the path to the Resort Area. |
+| **`DRU`** | 6 | Sewers (Alternate / Part 2) | Likely the second section of the sewers or a darker variant. |
+| **`APU`** | 9 | Amusement Park (Alternate) | "Amusement Park Ura". The park is only visited in the Alternate world. |
+| **`SPR`** | 32 | Central Silent Hill (Town Center) | Central Silent Hill streets. |
+| **`SPU`** | 33 | Alternate Central Silent Hill | Alternate Central Silent Hill (including the alternate shopping center). |
+| **`ER`** | 58 | Event / Extra Rooms (Interiors) & Nowhere | Isolated interiors: Balkan Church (`ER_CHRC`), School Bus (`ER_BUS`), Norman's Motel (`ER_MT*`), Annie's Bar (`ER_BILL`). Also contains Nowhere puzzle rooms that replace existing spaces in-game. |
 
 ### Disconnected Rooms and Nowhere
 
@@ -54,8 +54,3 @@ Some areas are structurally disconnected from the main grid or even from each ot
 
 When converting `DR` and `DRU` (Sewers) files, you may encounter missing texture dependencies (such as `DWAVE.TIM`, likely used for water effects) that are absent from the provided `complete` folder. This can cause the OBJ export script to fail at generating faces, resulting in a mesh that consists only of vertices.
 
----
-
-> [!NOTE]
-> **Next Steps for Verification:**
-> If we want to move these hypotheses to 100% confidence, we can test contiguous chunks (e.g., `THR0000`, `THR0100`, `THR0001`, `THR0101`). By generating OBJ files for a 2x2 grid, we can visually confirm how they seamlessly stitch together and whether their absolute world coordinates perfectly align with the logical coordinates in the file names.

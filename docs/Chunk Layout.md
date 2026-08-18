@@ -7,11 +7,11 @@ This document outlines how Silent Hill 1 handles the assembly of IPD chunks (loc
 The game world is conceptually divided into a 2D spatial grid, but the entire grid is never loaded at once due to the PlayStation 1's memory constraints. 
 
 - **IPD Chunks**: The world geometry is split into individual chunks stored in `.IPD` files on the disc. These chunks bake static collision data (walls, floors) and geometry layout.
-- **Dynamic Streaming**: The game dynamically streams these IPD chunks into memory. The global state (`g_Map`) tracks a maximum of **4 IPD chunks** at any one time (`ipdActive_15C[4]`).
-- **Cell Mapping**: A grid structure (`ipdGrid_1CC`, which is an 18x16 grid) acts as a lookup table connecting a grid cell coordinate to a specific IPD file index. As the player character moves, the function `Map_PlaceIpdAtCell` queues file reads to replace chunks that are no longer needed.
-- **Collision Queries**: When an entity moves or collision is tested (via functions like `Collision_Get`), the game translates its world `(X, Z)` coordinates into `(cellX, cellZ)`. The collision system (`func_800426E4`) walks the 4 active chunk slots to find the chunk holding that cell and fetches its `s_IpdCollisionData`. 
+- **Dynamic Streaming**: The game dynamically streams these IPD chunks into memory. The global state (`g_Map` / `s_MapTerrain`) tracks a maximum of **4 IPD chunks** at any one time (`activeChunks[4]`).
+- **Cell Mapping**: At map load, `Map_MakeIpdGrid` scans the global file table for all `FileType_Ipd` files whose filenames match the current map's `mapTag` (e.g. `"THR"`), parses the hex X/Z coordinates from each filename, and slots each file index into a spatial lookup grid (`s_MapTerrain.chunkGrid`). As the player character moves, `Map_PlaceIpdAtCell` queues file reads to replace chunks that are no longer needed.
+- **Collision Queries**: When an entity moves or collision is tested (via functions like `Collision_SurfaceGet`), the game translates its world `(X, Z)` coordinates into `(cellX, cellZ)`. The collision lookup walks the 4 active chunk slots to find the chunk holding that cell and fetches its `s_IpdCollisionData`. 
 
-This mechanism allows separate IPD models to seamlessly form a contiguous world space. If an entity steps outside the loaded grid in exterior areas, the game defaults to a fallback "void" chunk to prevent crashes, treating the ground as being infinitely low until the correct chunk is loaded.
+This mechanism allows separate IPD models to seamlessly form a contiguous world space. If an entity steps outside the loaded grid, the collision system returns a sentinel "void" result (`groundHeight = Q12(8.0f)` — infinitely low), causing characters to fall rather than get stuck, until the correct chunk streams in.
 
 ## 2. Representation of "Rooms"
 

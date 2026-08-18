@@ -40,8 +40,8 @@ Represents a physical object/mesh placed in the world. Stride: `dpos(j) = data_o
 
 #### 4. PLM_DATA_HEADER (16 bytes / 0x10)
 Defines the mesh geometry arrays embedded within the IPD.
-- `num_c` (4 bytes, uint32): Number of vertices.
-- `num_d` (4 bytes, uint32): Number of faces (polygons).
+- `num_c` (4 bytes, uint32): Normal sub-count (purpose unclear — may delimit "base" vs "derived" normals; see `docs/research/HYPOTHESES.md`).
+- `num_d` (4 bytes, uint32): **Normal array entry count.** Pack normal indices (`normals_0..normals_3`) reference entries 0 to num_d−1. This is the physical array bound, not `num_c`.
 - `obj_offset` (4 bytes, int32): Offset to the start of the `PLM_OBJ_DATA` table.
 - `normal_offset` (4 bytes, int32): Offset to vertex normals array. *Note: Normal arrays can occasionally terminate early; out-of-bound normal fetches default to (0,0,0) in game code.*
 
@@ -63,7 +63,7 @@ The game uses standard PlayStation `.TIM` files (15-bit RGB palette + 1 transpar
 
 1. **`unk1_data` (52 bytes in `IPD_FILE_HEADER`):** Non-zero in THR0000 (`00 04 04 06 0a ...`). Source comment: "drawing distance global table?". May be pairs of object-ID-to-draw-distance mappings. Requires cross-map comparison.
 2. **`unkdata_offset` in `IPD_FILE_HEADER`:** Confirmed non-zero (`0x09D4` in THR0000). Source comment: "1-byte × unk1_num drawing distance table per obj?". Falls in the gap between object data and PLM. Needs hex inspection.
-3. **`unk2` / `unk3` in `IPD_POS_HEADER`:** Non-zero packed values (e.g. `0x07FF0000`, `0x0FFF0800`). Increase monotonically between position groups. Provisional hypothesis: packed near/far draw-distance limits or bounding box extents. See `docs/HYPOTHESES.md`.
+3. **`unk2` / `unk3` in `IPD_POS_HEADER`:** Non-zero packed values (e.g. `0x07FF0000`, `0x0FFF0800`). Increase monotonically between position groups. Provisional hypothesis: packed near/far draw-distance limits or bounding box extents. See `docs/research/HYPOTHESES.md`.
 4. **8-byte blocks at `unk2_offset`:** Confirmed to exist immediately after each `IPD_OBJ_DATA` array. Content unread by `sh_ipd2obj`. Possible bounding sphere (6 bytes XYZ + 2 bytes alignment).
 
 ### Relationships
@@ -71,7 +71,7 @@ The game uses standard PlayStation `.TIM` files (15-bit RGB palette + 1 transpar
 - UVs map 1:1 to external `.TIM` files. The IPD determines the bounds (u,v) and palette (CLUT), but the TIM files hold the uncompressed indexed pixel data.
 
 ### Validation
-- **Extraction Match:** `ipd_to_obj.py` generates geometry, MTLS, and TGA texture maps byte-for-byte identical to the original C parser. (dubious claim, OBJ conversion was lossy)
+- **JSON Round-Trip:** The JSON intermediate pipeline (`ipd-json` → `json-ipd`) produces byte-identical binary output across all tested map prefixes (THR, SU, SPU). OBJ export is a lossy visualization format and is not used for binary validation.
 - **Normal Boundaries:** Safely bypasses segmentation faults found in the original tools when parsing incomplete/padded normal clusters.
 
 ### References

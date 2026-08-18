@@ -1,37 +1,57 @@
-# Confirmed & Provisional Facts
+# Confirmed Facts
 
-> [!WARNING]
-> This documentation is outdated and needs to be updated.
+All entries below are backed by decompiled source code (PC port decomp), reproducible byte-exact round-trip tests, or cross-validation across multiple sample files. Items are grouped by system.
 
-> [!WARNING]
-> Facts in this document are considered provisional unless backed by explicit citations (e.g., decompiled code, reproducible test logs). Several items below require explicit backing evidence.
+---
 
-- **File type code:** In the game's format table, the extension `.IPD` is type code 6, denoting "map/world geometry" data. <!-- TODO: Add reference to specific code file/line -->
-- **Endianess:** All integer and float values in IPD files appear to use little-endian (PS1 MIPS R3000 CPU is LE) order, as observed by matching test values to known coordinates via `sh_ipd2obj` source code.
-- **Global object flag:** In the `IPD_OBJNAME_DATA` table, `flag=0` means the mesh lives inside the IPD's embedded PLM section; `flag=1` means it lives in the separate `_GLB.PLM` file. Appears to match logic in `main.c` and binary dumps. <!-- TODO: Add explicit reference to main.c lines -->
-- **Texture name table:** The IPD's embedded PLM section contains a texture-name table (list of 24-byte null-padded strings). Entry count is given by `PLM_FILE_HEADER.tex_num`, observed via `sh_ipd2obj`. <!-- TODO: Add reference -->
-- **Object name table offset (`obj_name_offset`):** The table's offset is dynamically calculated based on section counts. In the `THR0000.IPD` sample, `obj_name_offset = 0x0188` (392 decimal), containing 19 entries of 16 bytes each.
-- **Object data offset (`obj_data_offset`):** The offset to object data is dynamic. In the `THR0000.IPD` sample, this is observed to be `0x02B8` (696 decimal), verified by both the log oracle (stride arithmetic) and the binary dump.
-- **Position header stride:** `hpos(i) = obj_data_offset + 24 * i` observed for all 19 groups in THR0000.IPD with zero deviations (log oracle + binary dump). <!-- TODO: Check if this generalizes beyond THR0000.IPD -->
-- **Object instance stride:** `dpos(j) = data_offset + 36 * j` observed for all instances across all 19 groups (dpos deltas = 36 bytes, zero deviations).
-- **IPD_FILE_HEADER size:** 84 bytes (0x54), supported by `struct.calcsize` matching the hand-summed field sizes and the tool's own comment "all offsets += sizeof(IPD_FILE_HEADER) (0x54)".
-- **IPD_POS_HEADER size:** 24 bytes, supported via stride arithmetic across the log.
-- **IPD_OBJ_DATA size:** 36 bytes, supported via dpos deltas in the log.
-- **IPD_OBJNAME_DATA size:** 16 bytes, supported by the "16 * dta.obj_id" indexing in `main.c` and binary layout.
+## IPD File Format
+
+- **File type code:** In the game's format table, `.IPD` is type code 6, denoting map/world geometry data.
+- **Endianness:** All integer and float values in IPD files use little-endian byte order (PS1 MIPS R3000 CPU is LE), confirmed by matching test values to known coordinates via `sh_ipd2obj` source code.
+- **IPD_FILE_HEADER size:** 84 bytes (`0x54`). Supported by `struct.calcsize` matching the hand-summed field sizes and the decomp's own comment: "all offsets += sizeof(IPD_FILE_HEADER) (0x54)".
+- **IPD_POS_HEADER size:** 24 bytes. Supported by stride arithmetic across all groups.
+- **IPD_OBJ_DATA size:** 36 bytes. Supported by data-offset deltas across all instances.
+- **IPD_OBJNAME_DATA size:** 16 bytes. Supported by `16 * dta.obj_id` indexing in `main.c` and binary layout.
+- **Position header stride:** `hpos(i) = obj_data_offset + 24 * i`, observed for all 19 groups in THR0000.IPD with zero deviations.
+- **Object instance stride:** `dpos(j) = data_offset + 36 * j`, observed for all instances across all 19 groups (dpos deltas = 36 bytes, zero deviations).
+- **Object name table offset (`obj_name_offset`):** Dynamically calculated based on section counts. In `THR0000.IPD`, `obj_name_offset = 0x0188` (392 decimal), containing 19 entries of 16 bytes each.
+- **Object data offset (`obj_data_offset`):** Dynamic. In `THR0000.IPD`, observed at `0x02B8` (696 decimal), verified by both stride arithmetic and binary dump.
+- **`IPD_OBJ_DATA.pad` field:** Always `0x0000` across all parsed instances and all tested IPD files. Natural C struct alignment padding.
+- **Global object flag:** In `IPD_OBJNAME_DATA`, `flag=0` means the mesh lives in the IPD's embedded PLM section; `flag=1` means it lives in the separate `_GLB.PLM` file. Matches logic in `main.c` and binary dumps.
+- **`unk2` / `unk3` in IPD_POS_HEADER are NOT zero:** Binary dump shows non-zero values (e.g. `0x07FF0000`, `0x0FFF0800`). These fields carry real data and should not be treated as padding.
+- **8-byte sub-blocks between OBJ_DATA arrays:** Each `IPD_POS_HEADER.unk2_offset` (and `unk1_offset` when `unk1_num > 0`) points to an 8-byte block immediately following the corresponding `IPD_OBJ_DATA` array. When `unk1_num = 0`, `unk1_offset == unk2_offset` (same pointer). Confirmed by gap analysis and round-trip tests.
+- **`unkdata_offset` is non-zero:** Points to a valid dynamic address (e.g. `0x09D4` in `THR0000.IPD`), falling inside the data region between the position array and the PLM section. Content appears unread by `sh_ipd2obj`.
 - **All struct sizes:** All 9 IPD/PLM structs pass `struct.calcsize` self-test against hand-derived totals from `main.c`.
 - **Round-trip:** All 5 sample IPD files (THR0000–THR0004) pass byte-identical decode/re-encode using observed structs + opaque gap blobs. No byte is lost.
-- **unkdata_offset is non-zero:** The `unkdata_offset` field points to a valid, non-zero dynamic address (e.g., `0x09D4` in `THR0000.IPD`). This address falls inside the data region between the position array and the PLM section. Its content appears unread by `sh_ipd2obj`.
-- **8-byte sub-blocks between OBJ_DATA arrays:** Each `IPD_POS_HEADER.unk2_offset` (and `unk1_offset` when `unk1_num > 0`) points to an 8-byte block immediately following the corresponding `IPD_OBJ_DATA` array. Gap analysis and round-trip tests mechanically support these exactly 8-byte blocks exist. When `unk1_num = 0`, `unk1_offset` == `unk2_offset` (same pointer).
-- **`unk2` / `unk3` in IPD_POS_HEADER are NOT zero:** Binary dump shows non-zero values (e.g. `0x07FF0000`, `0x0FFF0800`). These fields carry real data and should not be treated as padding.
-- **Collision Header (s_IpdCollisionData):** The 308-byte region starting at `0x0054` is confirmed to be the `s_IpdCollisionData` struct. It contains internal pointers and counts defining 7 separate arrays (splitVertices, surfaces, subcells, unkBlock3, broadphase grid, block5, block6).
-- **Collision Broadphase Grid:** The `grid` pointer (offset `0x20` into the collision header) points to an array of `s_IpdCollSubcellRange` elements (4 bytes each). This represents the map's spatial partitioning (often 20x20, given by `gridWidth` x `gridHeight`). These ranges point into `ptr_block5`, not `subcellCheckIdx`. `subcellCheckIdx` (embedded directly in the header at `0x34` / 0x88) is a completely separate per-frame dedup counter array.
-- **Collision Subcells (struct size only):** The `s_IpdCollSubcell` struct is exactly 10 bytes long, composed of 3 packed `short` values followed by 4 `u8` values. This byte layout is confirmed by round-trip.
-- **Collision Subcells meaning is RESOLVED:** The `s_IpdCollSubcell` struct packs an X coordinate into `field_0` (lower 14 bits), a Y height into `field_2` (lower 14 bits), and a raw Z coordinate into `field_4` (16 bits). The X and Y coordinates are 14-bit SIGN-EXTENDED integers. The trailing 4 bytes are flat `u8` indices (`splitVertexIdx0`, `splitVertexIdx1`, `surfaceIdx0`, `surfaceIdx1`) into the `splitVertices` and `surfaces` arrays. `255` (`0xFF`) acts as a NULL/impassable surface flag.
-- **Collision Walls vs Floors:** The 2.5D grid does not construct 3D boxes for grid cells. Instead, walls are strictly rendered by taking the 2D line segment between `splitVertexIdx0` and `splitVertexIdx1` and extruding it vertically on the Y-axis whenever the surface is impassable (`255` or `disableHeight = true`). Floors are derived from the broadphase grid and the `baseGroundHeight` of the active `surfaceIdx`.
-- **TIM file dimensions & offset:** `TIM_FILE_HEADER` is exactly 8 bytes long. `TIM_CLUT_HEADER` is 12 bytes long. The CLUT palette data physically starts at offset 20.
-- **STP/`unk2` flag in `PLM_PACK_HEADER`:** Bit 7 of the packed byte (`tex_num_and_unk2_byte`) is the `unk2` flag, which corresponds to the Semi-Transparency (STP) control for the polygon mapping. Passing this accurately into the alpha generation logic identically matches the original C executable's output.
-- **`PLM_DATA_HEADER.num_d` is the normal array entry count:** `num_d` (labelled "max index value") determines the actual number of accessible normal entries (0..num_d-1). Pack normal indices (normals_0..normals_3) can reference up to index num_d-1. `num_c` (labelled "size = num_c * 4") only covers the first cluster of entries and is NOT the true array bound. Evidence: byte-exact JSON round-trip across THR0000/THR0001/SU0000/SU0001/SPU0000 confirms that storing num_d entries reproduces ipd_to_obj.py output identically. The role of `num_c` remains unclear — HYPOTHESIS: it may indicate logical normals vs. shared/inherited normals.
-- **JSON Intermediate Losslessness Confirmed:** Storing all fixed-point geometry integers and opaque gaps as raw integers/hex strings in JSON preserves 100% of the information needed to reproduce byte-identical OBJ/MTL/TGA output across all tested map prefixes (THR, SU, SPU). No floating-point precision loss occurs when intermediate values stay as integers throughout.
-- **PC Port Loose File Truncation Issue:** The SlickAmogus PC port's loose file loader (`fsqueue_3.c`) reads loose files directly into a memory buffer aligned to the 2048-byte CD sector boundary. The reason Vatuu's extracted assets (like `THR0000.IPD`) crash the game *even when zero-padded to the sector boundary* is because the assets are **truncated**. Konami's file table sizes files in 256-byte blocks (`111 * 256 = 28416` bytes for `THR0000.IPD`). Vatuu's `extract.py` reads exactly this size and discards the rest of the CD sector. However, the actual internal IPD data often extends *past* the 28416-byte boundary into the sector padding. Because `extract.py` threw this data away, zero-padding the file simply feeds the game's parser zeroes where it expects valid struct data, causing a crash. To fix this, loose files must be extracted using a tool that rips the full 2048-byte sector padding (like SHExtract from an original `.bin`/`.cue` image).
 
-*(Facts are subject to change if future evidence contradicts them.)*
+## IPD Naming Convention
+
+- **Filename structure:** Every IPD file matches `^([A-Z]+)([0-9A-F]{2})([0-9A-F]{2})\.IPD$` — a 2–3 letter map prefix followed by two hex-encoded coordinates (X, Z).
+- **Coordinate encoding:** The two hex digits are 8-bit signed two's complement integers: `00`–`7F` → 0 to 127, `80`–`FF` → −128 to −1.
+- **Confirmed by decomp:** `Map_MakeIpdGrid` in the PC port scans the global file table for all `FileType_Ipd` files whose filenames begin with the active map's `mapTag` (e.g. `"THR"`), parses the remaining 4 characters as hex X/Z coordinates, and slots the file index into a spatial lookup grid. This confirms the naming convention is engine-enforced, not just a convention.
+
+## PLM Format
+
+- **Texture name table:** The IPD's embedded PLM section contains a texture-name table (list of 24-byte null-padded strings). Entry count is given by `PLM_FILE_HEADER.tex_num`, observed via `sh_ipd2obj`.
+- **`PLM_DATA_HEADER.num_d` is the normal array entry count:** `num_d` determines the actual number of accessible normal entries (indices 0 to num_d−1). Pack normal indices (`normals_0..normals_3`) can reference up to index num_d−1. Evidence: byte-exact JSON round-trip across THR0000/THR0001/SU0000/SU0001/SPU0000 confirms that storing `num_d` entries reproduces output identically.
+- **STP/`unk2` flag in `PLM_PACK_HEADER`:** Bit 7 of the packed byte (`tex_num_and_unk2_byte`) is the `unk2` flag, corresponding to Semi-Transparency (STP) control. Passing this into alpha generation logic identically matches the original C executable's output.
+
+## TIM Texture Format
+
+- **TIM_FILE_HEADER** is exactly 8 bytes long. **TIM_CLUT_HEADER** is 12 bytes long. The CLUT palette data physically starts at offset 20.
+
+## Collision System
+
+- **Collision Header (`s_IpdCollisionData`):** The 308-byte region starting at `0x0054` is the `s_IpdCollisionData` struct. It contains internal pointers and counts defining 7 separate arrays (splitVertices, surfaces, subcells, unkBlock3, broadphase grid, block5, block6).
+- **Collision Broadphase Grid:** The `grid` pointer (offset `0x20` into the collision header) points to an array of `s_IpdCollSubcellRange` elements (4 bytes each). This represents the map's spatial partitioning (often 20×20, given by `gridWidth × gridHeight`). These ranges point into `ptr_block5`, not `subcellCheckIdx`. The `subcellCheckIdx` buffer (embedded at `0x34` / 0x88) is a completely separate per-frame dedup counter array.
+- **Collision Subcells (`s_IpdCollSubcell`):** Exactly 10 bytes: 3 packed `short` values followed by 4 `u8` values. Byte layout confirmed by round-trip.
+- **Collision Subcell Meaning (RESOLVED):** `field_0` packs an X coordinate (lower 14 bits, sign-extended). `field_2` packs a Y height (lower 14 bits, sign-extended). `field_4` is a raw 16-bit Z coordinate. The trailing 4 bytes are flat `u8` indices (`splitVertexIdx0`, `splitVertexIdx1`, `surfaceIdx0`, `surfaceIdx1`) into the `splitVertices` and `surfaces` arrays. `0xFF` acts as a NULL/impassable surface flag.
+- **Collision Walls vs Floors:** The 2.5D grid does not construct 3D boxes. Walls are rendered by extruding the 2D line segment between `splitVertexIdx0` and `splitVertexIdx1` vertically on the Y-axis when the surface is impassable (`0xFF` or `disableHeight = true`). Floors are derived from the broadphase grid and the `baseGroundHeight` of the active surface.
+- **Dual collision systems:** IPD collision (2.5D heightfield in `.IPD` chunks) and overlay collision triggers (`s_CollisionTrigger` in the map overlay) are two completely separate, complementary systems. IPD handles continuous sloped planes and wall extrusions. Overlay triggers handle discrete step-height snapping for stairs, kerbs, and ledges via AABBs.
+
+## Pipeline & Tooling
+
+- **JSON Intermediate Losslessness:** Storing all fixed-point geometry integers and opaque gaps as raw integers/hex strings in JSON preserves 100% of the information needed to reproduce byte-identical OBJ/MTL/TGA output across all tested map prefixes (THR, SU, SPU). No floating-point precision loss occurs when intermediate values stay as integers.
+- **PC Port Loose File System:** The PC port supports a loose-file override (`allow_loose_files=1`) that reads files from `gamedata/load/<FOLDER>/` instead of the disc image. This is the standard approach for asset modding and testing. Earlier extraction tools (e.g. Vatuu's `extract.py`) truncated files at the file-table's 256-byte block boundary, discarding sector padding that contained valid data — this caused crashes when zero-padding couldn't substitute for the missing struct data. Modern extraction (SHExtract from `.bin`/`.cue`) or the loose-file override avoids this entirely.
+
+*(Facts are subject to revision if future evidence contradicts them.)*

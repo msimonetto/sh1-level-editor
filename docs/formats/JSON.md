@@ -44,14 +44,14 @@ Manual bidirectional conversions are executed via the modular CLI:
 
 ```bash
 # IPD <-> JSON
-python scripts/convert.py ipd-to-json <file.IPD> [-a <assets_dir>]
-python scripts/convert.py json-to-ipd <file.json> [-o <out.IPD>]
+python scripts/convert.py ipd-json <file.IPD> [-a <assets_dir>]
+python scripts/convert.py json-ipd <file.json> [-o <out.IPD>]
 
 # PLM <-> JSON
-python scripts/convert.py plm-to-json <file.PLM>
-python scripts/convert.py json-to-plm <file.json> [-o <out.PLM>]
+python scripts/convert.py plm-json <file.PLM>
+python scripts/convert.py json-plm <file.json> [-o <out.PLM>]
 
 # TIM <-> PNG
-python scripts/convert.py tim-to-png <file.TIM> <out_dir>
-python scripts/convert.py png-to-tim <indexed.png> <cluts.png> <out.TIM>
+python scripts/convert.py tim-png <file.TIM> <out_stem>
+python scripts/convert.py png-tim <indexed_stem> <out.TIM>
 ```

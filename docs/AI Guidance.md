@@ -22,7 +22,7 @@ Before doing anything else, internalize these rules:
 
 When the user says **"start a new session on X"** or **"continue with [task]"**, do this — and only this:
 
-1. **Find the task folder.** If the user specifies a task, locate its folder in `tasks/` (defaulting to `tasks/FullEditor/` for core editor features).
+1. **Find the task folder.** If the user specifies a task, locate its folder in `tasks/` (defaulting to `tasks/FullEditor/` for core editor features). If the task name maps to a subdirectory in `tasks/`, use that directly.
 2. **Read the active task file.** Read `tasks/[task]/TASK.md` (and any related `TODO.md` / implementation plans) to identify the active goal, current status, and next steps.
 3. **Check the Architecture Index.** Consult `docs/ARCHITECTURE.md` to pinpoint relevant classes, headers, and methods before making code changes.
 4. **Begin work.** Rely natively on the current conversation memory. Only open `docs/formats/` files if you need to reference specific binary structures.
@@ -40,7 +40,7 @@ tasks/
   Dependencies/      ← Workspace file manager & asset dependency graph
   GlobalObjects/     ← PLM object manager & global prop libraries
   Waypoints/         ← Room linkage, door triggers, and navigation points
-  BinaryOverlays/    ← Binary overlay analysis & custom map director
+  BinaryOverlays/    ← Map overlay architecture, camera/spawn/event structs
   Audio/             ← PS1 audio player & environmental soundscapes
   ContextMenus/      ← Viewport right-click context actions
 ```
