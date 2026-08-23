@@ -261,8 +261,8 @@ bool IPDParse::Parse(const std::string& ipdPath,
     bool glbLoaded = false;
 
     if (needsGlobal) {
-        // Try workspace/geometry/{PREFIX}_GLB.PLM
-        std::string glbPath = workspaceDir + "/geometry/" + out.chunkPrefix + "_GLB.PLM";
+        // Try workspace/PLM/{PREFIX}_GLB.PLM
+        std::string glbPath = workspaceDir + "/PLM/" + out.chunkPrefix + "_GLB.PLM";
         FILE* gf = fopen(glbPath.c_str(), "rb");
         if (!gf) {
             // Fallback: same directory as IPD

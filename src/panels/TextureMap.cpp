@@ -128,7 +128,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     
     auto it = m_recentTiles.begin();
     while (it != m_recentTiles.end()) {
-        std::string path = fileManager.GetWorkspaceDir() + "/textures/" + it->texName + ".TIM";
+        std::string path = fileManager.GetWorkspaceDir() + "/TIM/" + it->texName + ".TIM";
         if (!std::filesystem::exists(path)) {
             it = m_recentTiles.erase(it);
         } else {
@@ -197,7 +197,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
 
     // if we selected a face, update texture manager
     if (activeFace && !activeFace->texName.empty()) {
-      std::string path = fileManager.GetWorkspaceDir() + "/textures/" +
+      std::string path = fileManager.GetWorkspaceDir() + "/TIM/" +
                          activeFace->texName + ".TIM";
       if (path != Config::Get().LastTexturePath) {
         if (path != lastFailedPath) {
@@ -251,7 +251,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     lastTexRefreshTime = ImGui::GetTime();
     cachedTextures.clear();
     
-    std::string texDir = currentWorkspaceDir + "/textures/";
+    std::string texDir = currentWorkspaceDir + "/TIM/";
     if (std::filesystem::exists(texDir) && std::filesystem::is_directory(texDir)) {
       for (const auto &entry : std::filesystem::directory_iterator(texDir)) {
         if (entry.is_regular_file()) {
@@ -359,7 +359,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
       for (const auto &tex : cachedTextures) {
         if (ImGui::Selectable(tex.c_str())) {
           std::string path =
-              fileManager.GetWorkspaceDir() + "/textures/" + tex + ".TIM";
+              fileManager.GetWorkspaceDir() + "/TIM/" + tex + ".TIM";
           if (testTexture.Load(path)) {
             Config::Get().LastTexturePath = path;
             Config::Get().Save();
@@ -641,7 +641,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
       if (ImGui::Button("Reset Face to Original State")) {
         if (hasBackup) {
           *activeMesh = originalMeshBackup;
-          std::string path = fileManager.GetWorkspaceDir() + "/textures/" +
+          std::string path = fileManager.GetWorkspaceDir() + "/TIM/" +
                              activeFace->texName + ".TIM";
           if (path != Config::Get().LastTexturePath) {
             if (testTexture.Load(path)) {
@@ -666,7 +666,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         auto syncUiToActiveFace = [&]() {
           if (activeFace && !activeFace->texName.empty()) {
             std::string expectedPath = fileManager.GetWorkspaceDir() +
-                                       "/textures/" + activeFace->texName +
+                                       "/TIM/" + activeFace->texName +
                                        ".TIM";
             if (Config::Get().LastTexturePath != expectedPath ||
                 testTexture.GetTexture().id == 0) {
@@ -718,9 +718,9 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         if (ImGui::Button("Save Chunk (S)") && activeObjName) {
           std::string workDir = fileManager.GetWorkspaceDir();
           std::string chunk = localGeometryOverlay.m_selectedChunk;
-          std::string ipdPath = workDir + "/chunks/" + chunk + ".IPD";
+          std::string ipdPath = workDir + "/IPD/" + chunk + ".IPD";
           std::string prefix = DeriveChunkPrefix(chunk);
-          std::string glbPath = workDir + "/geometry/" + prefix + "_GLB.PLM";
+          std::string glbPath = workDir + "/PLM/" + prefix + "_GLB.PLM";
           ParsedChunk *cd = nullptr;
           for (auto &lc : localGeometryOverlay.GetChunks())
             if (lc.data->chunkName == chunk) {
@@ -745,7 +745,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         }
         if (ImGui::IsItemHovered())
           ImGui::SetTooltip("Save all face edits directly to "
-                            "workspace/chunks/*.IPD (Ctrl-S)");
+                            "workspace/IPD/*.IPD (Ctrl-S)");
 
         ImGui::SameLine();
         if (ImGui::Button("Validate")) {
@@ -831,7 +831,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         m_currentTile = t;
         // Also update the main Texture Manager view
         std::string expectedPath = fileManager.GetWorkspaceDir() +
-                                   "/textures/" + t.texName + ".TIM";
+                                   "/TIM/" + t.texName + ".TIM";
         if (Config::Get().LastTexturePath != expectedPath) {
           if (testTexture.Load(expectedPath)) {
             Config::Get().LastTexturePath = expectedPath;

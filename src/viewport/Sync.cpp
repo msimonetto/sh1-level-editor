@@ -34,7 +34,7 @@ void ViewportSync::Update(FileManager &fileManager, Viewport &sceneViewport,
         m_loadingChunks.push_back(c);
         newLoads++;
 
-        std::string path = workspaceDir + "/chunks/" + c + ".IPD";
+        std::string path = workspaceDir + "/IPD/" + c + ".IPD";
 
         // Spawn detached thread
         std::thread([this, path, workspaceDir, c]() {

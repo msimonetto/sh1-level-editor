@@ -37,7 +37,7 @@ void GlobalGeometryViewport::SetWorkspaceDir(const std::string &dir) {
   if (m_workspaceDir != dir) {
     m_workspaceDir = dir;
     m_availableFiles.clear();
-    std::string geomDir = m_workspaceDir + "/geometry";
+    std::string geomDir = m_workspaceDir + "/PLM";
     if (fs::exists(geomDir)) {
       for (const auto &entry : fs::directory_iterator(geomDir)) {
         if (entry.is_regular_file() && (entry.path().extension() == ".PLM" || entry.path().extension() == ".plm")) {
@@ -555,7 +555,7 @@ void GlobalGeometryViewport::AutoLoadPlmFile(const std::string &filename) {
       return;
   }
 
-  std::string glbPath = m_workspaceDir + "/geometry/" + filename + ".PLM";
+  std::string glbPath = m_workspaceDir + "/PLM/" + filename + ".PLM";
 
   if (!fs::exists(glbPath)) {
     m_loadedGlbPath.clear();
@@ -641,7 +641,7 @@ void GlobalGeometryViewport::BuildDependencyIndex() {
 
     // Folders to scan
     std::vector<std::string> scanDirs = {
-        workDir + "/chunks", workDir + "/../assets/BG", workDir + "/../assets"};
+        workDir + "/IPD", workDir + "/../assets/BG", workDir + "/../assets"};
 
     std::set<std::string> scannedFiles;
 
@@ -661,8 +661,8 @@ void GlobalGeometryViewport::BuildDependencyIndex() {
 
           // Check if chunk binary exists in workspace
           bool inWorkspace =
-              fs::exists(workDir + "/chunks/" + chunkName + ".IPD") ||
-              fs::exists(workDir + "/chunks/" + chunkName + ".ipd");
+              fs::exists(workDir + "/IPD/" + chunkName + ".IPD") ||
+              fs::exists(workDir + "/IPD/" + chunkName + ".ipd");
 
           FILE *f = fopen(filePath.c_str(), "rb");
           if (!f)

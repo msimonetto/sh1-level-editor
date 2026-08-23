@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
     }
     if (cache.find(name) == cache.end()) {
       bool ext = std::filesystem::exists(fileManager.GetWorkspaceDir() +
-                                         "/chunks/" + name + ".IPD");
+                                         "/IPD/" + name + ".IPD");
       bool dep = std::filesystem::exists(fileManager.GetOverrideDir() +
                                          "/BG/" + name + ".IPD");
       cache[name] = {ext, dep};

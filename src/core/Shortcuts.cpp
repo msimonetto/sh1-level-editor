@@ -42,8 +42,8 @@ void Shortcuts::SaveSelected(FileManager &fileManager,
   if (!selectedChunks.empty()) {
     for (const auto &chunkName : selectedChunks) {
       std::string workspaceDir = fileManager.GetWorkspaceDir();
-      std::string ipdPath = workspaceDir + "/chunks/" + chunkName + ".IPD";
-      std::string glbPath = workspaceDir + "/geometry/" +
+      std::string ipdPath = workspaceDir + "/IPD/" + chunkName + ".IPD";
+      std::string glbPath = workspaceDir + "/PLM/" +
                             DeriveChunkPrefix(chunkName) + "_GLB.PLM";
 
       ParsedChunk *chunkData = nullptr;
@@ -86,8 +86,8 @@ void Shortcuts::SaveAll(FileManager &fileManager,
     if (lc.data) {
       std::string chunkName = lc.data->chunkName;
       std::string workspaceDir = fileManager.GetWorkspaceDir();
-      std::string ipdPath = workspaceDir + "/chunks/" + chunkName + ".IPD";
-      std::string glbPath = workspaceDir + "/geometry/" +
+      std::string ipdPath = workspaceDir + "/IPD/" + chunkName + ".IPD";
+      std::string glbPath = workspaceDir + "/PLM/" +
                             DeriveChunkPrefix(chunkName) + "_GLB.PLM";
 
       int n = 0;

@@ -141,10 +141,13 @@ bool FileManager::ExtractToWorkspace(const std::vector<std::string>& chunks, con
     
     fs::path sourceDir = fs::exists(compDir / "BG") ? compDir / "BG" : compDir;
     
-    fs::create_directories(workDir / "chunks");
-    fs::create_directories(workDir / "geometry");
-    fs::create_directories(workDir / "textures");
+    fs::create_directories(workDir / "IPD");
+    fs::create_directories(workDir / "PLM");
+    fs::create_directories(workDir / "TIM");
+    fs::create_directories(workDir / "OBJ");
     fs::create_directories(workDir / "misc");
+    fs::create_directories(workDir / "audio");
+    fs::create_directories(workDir / "overlays");
     
     DependencyManager depMgr(workspaceDir);
     
@@ -156,7 +159,7 @@ bool FileManager::ExtractToWorkspace(const std::vector<std::string>& chunks, con
             continue;
         }
         
-        fs::path targetIpd = workDir / "chunks" / (chunk + ".IPD");
+        fs::path targetIpd = workDir / "IPD" / (chunk + ".IPD");
         fs::copy_file(sourceIpd, targetIpd, fs::copy_options::overwrite_existing);
         
         std::string prefix = chunk;
@@ -176,10 +179,10 @@ bool FileManager::ExtractToWorkspace(const std::vector<std::string>& chunks, con
                 if (ext == ".BIN") {
                     fs::copy_file(entry.path(), workDir / "misc" / fname, fs::copy_options::overwrite_existing);
                 } else if (ext == ".TIM") {
-                    fs::copy_file(entry.path(), workDir / "textures" / fname, fs::copy_options::overwrite_existing);
+                    fs::copy_file(entry.path(), workDir / "TIM" / fname, fs::copy_options::overwrite_existing);
                     depMgr.AddDependency(prefix, chunk, "textures", fname);
                 } else if (ext == ".PLM") {
-                    fs::copy_file(entry.path(), workDir / "geometry" / fname, fs::copy_options::overwrite_existing);
+                    fs::copy_file(entry.path(), workDir / "PLM" / fname, fs::copy_options::overwrite_existing);
                     depMgr.AddDependency(prefix, chunk, "geometry", fname);
                 }
             }
@@ -246,9 +249,9 @@ bool FileManager::DeployToTarget(const std::vector<std::string>& chunks, const s
     
     for (const auto& fname : filesToCheck) {
         fs::path wsPath;
-        if (fname.find(".IPD") != std::string::npos) wsPath = workDir / "chunks" / fname;
-        else if (fname.find(".PLM") != std::string::npos) wsPath = workDir / "geometry" / fname;
-        else if (fname.find(".TIM") != std::string::npos) wsPath = workDir / "textures" / fname;
+        if (fname.find(".IPD") != std::string::npos) wsPath = workDir / "IPD" / fname;
+        else if (fname.find(".PLM") != std::string::npos) wsPath = workDir / "PLM" / fname;
+        else if (fname.find(".TIM") != std::string::npos) wsPath = workDir / "TIM" / fname;
         else if (fname.find(".BIN") != std::string::npos) wsPath = workDir / "misc" / fname;
         else wsPath = workDir / fname;
         
@@ -283,7 +286,7 @@ bool FileManager::DeleteSelected(const std::string& targetType, const std::vecto
     
     fs::path chunksDir, geomDir, texDir, miscDir;
     if (targetType == "workspace") {
-        chunksDir = workDir / "chunks"; geomDir = workDir / "geometry"; texDir = workDir / "textures"; miscDir = workDir / "misc";
+        chunksDir = workDir / "IPD"; geomDir = workDir / "PLM"; texDir = workDir / "TIM"; miscDir = workDir / "misc";
     } else {
         fs::path bgDir = fs::path(overrideDir) / "BG";
         chunksDir = bgDir; geomDir = bgDir; texDir = bgDir; miscDir = bgDir;
@@ -353,9 +356,10 @@ bool FileManager::ClearEntire(const std::string& targetType, const std::string& 
     
     if (targetType == "workspace") {
         fs::path w = fs::path(workspaceDir);
-        ClearDir(w / "chunks");
-        ClearDir(w / "geometry");
-        ClearDir(w / "textures");
+        ClearDir(w / "IPD");
+        ClearDir(w / "PLM");
+        ClearDir(w / "TIM");
+        ClearDir(w / "OBJ");
         ClearDir(w / "misc");
         
         DependencyManager depMgr(workspaceDir);

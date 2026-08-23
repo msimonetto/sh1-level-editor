@@ -134,7 +134,7 @@ Texture2D TextureCache::Fetch(const std::string& texName, int paletteRow,
     
     if (!img) {
         auto newImg = std::make_shared<Textures>();
-        std::string timPath = workspaceDir + "/textures/" + texName + ".TIM";
+        std::string timPath = workspaceDir + "/TIM/" + texName + ".TIM";
         if (!newImg->Load(timPath)) {
             printf("[TextureCache] Failed to load TIM: %s\n", timPath.c_str());
             std::lock_guard<std::mutex> lock(m_mutex);
@@ -182,7 +182,7 @@ void TextureCache::Preload(const std::string& texName, const std::string& worksp
     }
     
     auto img = std::make_shared<Textures>();
-    std::string timPath = workspaceDir + "/textures/" + texName + ".TIM";
+    std::string timPath = workspaceDir + "/TIM/" + texName + ".TIM";
     if (img->Load(timPath)) {
         std::lock_guard<std::mutex> lock(m_mutex);
         auto& entry = m_entries[texName];
@@ -209,7 +209,7 @@ void TextureCache::GetDimensions(const std::string& texName,
 
     if (!entry.image) {
         entry.image = std::make_shared<Textures>();
-        std::string timPath = workspaceDir + "/textures/" + texName + ".TIM";
+        std::string timPath = workspaceDir + "/TIM/" + texName + ".TIM";
         if (!entry.image->Load(timPath)) {
             entry.loadFailed = true;
             entry.image = nullptr;

@@ -64,7 +64,7 @@ void ChunksPanel::DrawGrid(FileManager& mgr, Dictionary& dict) {
   auto ensureCached = [&](const std::string &name) {
     if (fsCache.find(name) == fsCache.end()) {
       fsCache[name].first =
-          fs::exists(fs::path(workspaceDir) / "chunks" / (name + ".IPD"));
+          fs::exists(fs::path(workspaceDir) / "IPD" / (name + ".IPD"));
       fsCache[name].second =
           fs::exists(fs::path(overrideDir) / "BG" / (name + ".IPD"));
     }
@@ -442,7 +442,7 @@ void ChunksPanel::Draw(FileManager& mgr, Dictionary& dict, DependencyManager& de
     ImGui::Text(ICON_FA_VIDEO " Viewport");
     if (ImGui::Button(ICON_FA_BORDER_ALL " Add Selection", ImVec2(halfWidth, 0))) {
       for (const auto &c : mgr.m_selectedChunks) {
-        if (fs::exists(fs::path(mgr.GetWorkspaceDir()) / "chunks" / (c + ".IPD"))) {
+        if (fs::exists(fs::path(mgr.GetWorkspaceDir()) / "IPD" / (c + ".IPD"))) {
           if (std::find(mgr.m_viewportChunks.begin(), mgr.m_viewportChunks.end(), c) == mgr.m_viewportChunks.end()) {
             mgr.m_viewportChunks.push_back(c);
           }
