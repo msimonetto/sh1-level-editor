@@ -15,9 +15,6 @@ public:
     bool Load(const std::string& filepath);
     void Unload();
 
-    // PNG Conversion
-    bool SaveToPNG(const std::string& outPathStem);
-    bool LoadFromPNG(const std::string& inPathStem);
 
     // For ImGui rendering
     Texture2D GetTexture() const { return m_texture; }

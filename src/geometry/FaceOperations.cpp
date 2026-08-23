@@ -112,8 +112,10 @@ bool TriangulateFaces(LocalGeometryOverlay& overlay, History* history) {
                     t2.rawU[0] = f.rawU[0]; t2.rawU[1] = f.rawU[2]; t2.rawU[2] = f.rawU[3]; t2.rawU[3] = f.rawU[0];
                     t2.rawV[0] = f.rawV[0]; t2.rawV[1] = f.rawV[2]; t2.rawV[2] = f.rawV[3]; t2.rawV[3] = f.rawV[0];
 
-                    newFaces.push_back(t1);
-                    newFaces.push_back(t2);
+                    t1.isDirty = true;
+newFaces.push_back(t1);
+                    t2.isDirty = true;
+newFaces.push_back(t2);
                     meshChanged = true;
                 } else {
                     newFaces.push_back(f);
@@ -237,7 +239,8 @@ bool ConnectBridgeFaces(LocalGeometryOverlay& overlay, History* history) {
         int minIdx = std::min(f1Idx, f2Idx);
         mesh.faces.erase(mesh.faces.begin() + maxIdx);
         mesh.faces.erase(mesh.faces.begin() + minIdx);
-        mesh.faces.push_back(quad);
+        quad.isDirty = true;
+mesh.faces.push_back(quad);
 
         if (history) {
             snap.after = mesh;
@@ -391,7 +394,8 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                             }
                         }
 
-                        sideQuads.push_back(side);
+                        side.isDirty = true;
+sideQuads.push_back(side);
                     }
                 }
 
@@ -405,7 +409,8 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                 }
 
                 // Replace the original face with the new cap face
-                mesh.faces[fIdx] = capFace;
+                capFace.isDirty = true;
+mesh.faces[fIdx] = capFace;
 
                 newGlobalSelectedFaces.insert({ cName, oIdx, mIdx, fIdx });
                 if (newPrimarySelectedFace < 0) newPrimarySelectedFace = fIdx;
@@ -501,6 +506,7 @@ bool InvertNormals(LocalGeometryOverlay& overlay, History* history) {
                     std::swap(face.rawU[0], face.rawU[2]);
                     std::swap(face.rawV[0], face.rawV[2]);
                 }
+                face.isDirty = true;
                 changed = true;
             }
 
@@ -714,6 +720,8 @@ bool PaintFaces(LocalGeometryOverlay& overlay, History* history) {
                     face.rawV[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][1] * 255.0f), 0, 255);
                 }
 
+                face.isDirty = true;
+
                 changed = true;
             }
 
@@ -780,6 +788,7 @@ bool ClearTexture(LocalGeometryOverlay& overlay, History* history) {
                 face.texName = "";
                 face.texNum = 0x7F;
                 face.paletteRow = 0;
+                face.isDirty = true;
                 changed = true;
             }
 
@@ -862,6 +871,7 @@ bool RotateUV(LocalGeometryOverlay& overlay, int steps, History* history) {
                     face.rawU[0] = lastRawU;
                     face.rawV[0] = lastRawV;
                 }
+                face.isDirty = true;
                 changed = true;
             }
 
@@ -944,6 +954,7 @@ bool FlipUV(LocalGeometryOverlay& overlay, bool horizontal, bool vertical, Histo
                         face.rawV[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][1] * 255.0f), 0, 255);
                     }
                 }
+                face.isDirty = true;
                 changed = true;
             }
 
@@ -1027,6 +1038,7 @@ bool FitUVToTileBounds(LocalGeometryOverlay& overlay, History* history) {
                     face.rawU[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][0] * 255.0f), 0, 255);
                     face.rawV[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][1] * 255.0f), 0, 255);
                 }
+                face.isDirty = true;
                 changed = true;
             }
 
@@ -1108,6 +1120,7 @@ bool ResetDefaultUV(LocalGeometryOverlay& overlay, History* history) {
                     face.rawU[0] = 0;   face.rawU[1] = 255; face.rawU[2] = 255;
                     face.rawV[0] = 0;   face.rawV[1] = 0;   face.rawV[2] = 255;
                 }
+                face.isDirty = true;
                 changed = true;
             }
 

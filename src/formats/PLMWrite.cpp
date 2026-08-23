@@ -245,11 +245,16 @@ int PLMWrite::UpdateMeshStructure(std::vector<uint8_t>& buf,
                 memcpy(buf.data() + vzOff, &pz, 2);
             }
 
+            bool structuralChange = (newVertNum != origVertNum) || (newPackNum != origPackNum);
+
             // Encode Faces
             for (int p = 0; p < newPackNum; ++p) {
-                int pkOff = plmBase + dh->pack_offset + p * (int)sizeof(PLM_PACK_HEADER);
-                EncodeFaceAtOffset(buf, rmesh.faces[p], pkOff);
-                count++;
+                if (rmesh.faces[p].isDirty || structuralChange) {
+                    int pkOff = plmBase + dh->pack_offset + p * (int)sizeof(PLM_PACK_HEADER);
+                    EncodeFaceAtOffset(buf, rmesh.faces[p], pkOff);
+                    count++;
+                    const_cast<RenderFace&>(rmesh.faces[p]).isDirty = false;
+                }
             }
         }
     }

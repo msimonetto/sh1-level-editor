@@ -72,6 +72,7 @@ struct RenderFace {
     uint8_t     unk1;       // Preserved unk1 byte (lighting/color flags)
     uint8_t     origTexByte;// Preserved tex_num_and_unk2_byte (bit 7 flags)
     uint8_t     normals[4]; // Preserved normal indices for lighting
+    bool        isDirty = false; // Flag to indicate face data has been modified
 };
 
 // ---------------------------------------------------------------------------
