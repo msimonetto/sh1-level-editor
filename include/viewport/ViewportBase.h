@@ -47,8 +47,11 @@ struct GpuBatch {
         if (this != &other) {
             if (meshUploaded) {
                 UnloadMesh(mesh);
-                material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
-                UnloadMaterial(material);
+                if (material.maps != nullptr) {
+                    material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
+                    material.shader.id = rlGetShaderIdDefault();
+                    UnloadMaterial(material);
+                }
             }
             texName = std::move(other.texName);
             paletteRow = other.paletteRow;
@@ -66,6 +69,11 @@ struct GpuBatch {
     ~GpuBatch() {
         if (meshUploaded) {
             UnloadMesh(mesh);
+            if (material.maps != nullptr) {
+                material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
+                material.shader.id = rlGetShaderIdDefault();
+                UnloadMaterial(material);
+            }
             meshUploaded = false;
         }
     }

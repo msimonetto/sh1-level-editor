@@ -214,7 +214,9 @@ Thread-safe in-memory GPU texture cache and registry for the 3D viewport.
   - `Fetch(texName, paletteRow, workspaceDir)`: Retrieves or loads texture from disk.
   - `Preload(texName, workspaceDir)`: Worker-thread friendly background loading.
   - `GetDimensions(texName, workspaceDir, w, h)`: Retrieves texture dimensions.
-  - `UnloadAll()`: Cleans up GPU memory on exit or reload.
+  - `GetAlphaCutoutShader()`: Returns or compiles the shared GLSL 330 alpha-cutout shader with discard support.
+  - `CreateMeshMaterial(texName, paletteRow, workspaceDir)`: Builds a Raylib `Material` with the alpha-cutout shader and diffuse texture.
+  - `UnloadAll()`: Cleans up GPU memory and shaders on exit or reload.
 
 ### `Textures.h`
 PlayStation `.TIM` texture loader and CLUT palette manager.

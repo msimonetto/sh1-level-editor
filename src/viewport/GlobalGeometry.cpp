@@ -528,13 +528,7 @@ void GlobalGeometryViewport::RebuildGpuBatches(int idx) {
     gpuBatch.mesh = mesh;
     gpuBatch.meshUploaded = true;
 
-    gpuBatch.material = LoadMaterialDefault();
-    if (!cb.texName.empty()) {
-      Texture2D tex = cache.Fetch(cb.texName, cb.palRow, m_workspaceDir);
-      if (tex.id != 0) {
-        gpuBatch.material.maps[MATERIAL_MAP_DIFFUSE].texture = tex;
-      }
-    }
+    gpuBatch.material = cache.CreateMeshMaterial(cb.texName, cb.palRow, m_workspaceDir);
 
     m_selectedBatches.push_back(std::move(gpuBatch));
   }

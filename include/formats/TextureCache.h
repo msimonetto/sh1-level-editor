@@ -39,7 +39,14 @@ public:
     void GetDimensions(const std::string& texName, const std::string& workspaceDir,
                        int& w, int& h);
 
-    // Release all cached GPU textures.  Call before CloseWindow().
+    // Return the shared alpha cutout shader for 3D mesh rendering
+    Shader GetAlphaCutoutShader();
+
+    // Create a Raylib Material initialized with the alpha cutout shader and diffuse texture
+    Material CreateMeshMaterial(const std::string& texName, int paletteRow,
+                                const std::string& workspaceDir);
+
+    // Release all cached GPU textures and shader. Call before CloseWindow().
     void UnloadAll();
 
 private:
@@ -51,6 +58,10 @@ private:
         // Per-palette GPU texture: index = paletteRow
         std::map<int, Texture2D> paletteTextures;
     };
+
+    // Shared alpha-discard shader for 3D viewport materials
+    Shader m_alphaCutoutShader = {0};
+    bool m_alphaShaderLoaded = false;
 
     // texName → cache entry
     std::map<std::string, CacheEntry> m_entries;

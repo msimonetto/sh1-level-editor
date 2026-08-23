@@ -119,13 +119,7 @@ void Viewport::BuildGpuBatches(LoadedChunk &lc,
         lc.bounds.max.z = std::max(lc.bounds.max.z, meshBox.max.z);
 
         // --- Build Raylib Material ---
-        gpuBatch.material = LoadMaterialDefault();
-        if (!texName.empty() && !isNoTex) {
-            Texture2D tex = cache.Fetch(texName, batch.paletteRow, workspaceDir);
-            if (tex.id != 0) {
-                gpuBatch.material.maps[MATERIAL_MAP_DIFFUSE].texture = tex;
-            }
-        }
+        gpuBatch.material = cache.CreateMeshMaterial(texName, batch.paletteRow, workspaceDir);
 
         lc.batches.push_back(std::move(gpuBatch));
     }
