@@ -6,7 +6,7 @@
 #include <memory>
 #include "raylib.h"
 #include "rlgl.h"
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 
 // ---------------------------------------------------------------------------
 // ViewportBase — Base class for 3D rendering panels via Raylib + rlImGui

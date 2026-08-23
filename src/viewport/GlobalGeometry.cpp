@@ -6,7 +6,8 @@
 #include <map>
 #include <set>
 
-#include "core/structs.h"
+#include "formats/Structs.h"
+#include "formats/PLMParse.h"
 #include "imgui.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -566,7 +567,7 @@ void GlobalGeometryViewport::AutoLoadPlmFile(const std::string &filename) {
   std::vector<std::string> texNames;
   std::vector<IPDParse::GlbObjectInfo> info;
 
-  if (!IPDParse::ParseGlbFile(glbPath, renderObjs, texNames, info)) {
+  if (!PLMParse::ParseGlbFile(glbPath, renderObjs, texNames, info)) {
     m_statusMsg = "Failed to parse PLM: " + glbPath;
     return;
   }

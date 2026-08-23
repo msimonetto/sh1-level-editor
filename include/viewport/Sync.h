@@ -1,5 +1,5 @@
 #pragma once
-#include "core/structs.h"
+#include "formats/Structs.h"
 #include <atomic>
 #include <memory>
 #include <mutex>

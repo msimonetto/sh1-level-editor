@@ -1,7 +1,7 @@
 #include "panels/Maps.h"
 #include "core/AssetManager.h"
 #include "core/MapTable.h"
-#include "core/OverlayLoader.h"
+#include "formats/OverlayLoader.h"
 #include "imgui.h"
 #include "extras/IconsFontAwesome6.h"
 #include <algorithm>

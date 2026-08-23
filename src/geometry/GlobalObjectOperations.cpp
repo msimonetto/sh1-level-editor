@@ -1,8 +1,8 @@
 #include "geometry/GlobalObjectOperations.h"
 #include "viewport/LocalGeometry.h"
 #include "core/History.h"
-#include "core/IPDParse.h"
-#include "core/IPDWrite.h"
+#include "formats/IPDParse.h"
+#include "formats/IPDWrite.h"
 #include "raylib.h"
 #include "raymath.h"
 #include <cmath>

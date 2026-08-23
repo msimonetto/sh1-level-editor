@@ -1,5 +1,5 @@
 #include "viewport/Scene.h"
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 #include "core/Textures.h"
 #include "raymath.h"
 #include <algorithm>

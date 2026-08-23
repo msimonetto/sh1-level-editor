@@ -1,4 +1,4 @@
-#include "core/OverlayLoader.h"
+#include "formats/OverlayLoader.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>

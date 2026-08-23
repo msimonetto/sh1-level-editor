@@ -34,7 +34,7 @@ Color Textures::WordToColor(uint16_t word) {
     uint8_t a = 255;
     if (word == 0x0000) a = 0;
     else if (stp == 1) a = 255;
-    else a = 127;
+    else a = 255;
     return {r, g, b, a};
 }
 

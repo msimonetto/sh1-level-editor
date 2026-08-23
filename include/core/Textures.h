@@ -5,7 +5,7 @@
 #include <memory>
 #include <mutex>
 #include "raylib.h"
-#include "core/structs.h"
+#include "formats/Structs.h"
 
 struct TIMPalette {
     std::vector<Color> colors;

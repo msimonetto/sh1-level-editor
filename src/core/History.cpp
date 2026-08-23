@@ -1,6 +1,6 @@
 #include "core/History.h"
-#include "core/OverlayLoader.h"
-#include "core/IPDWrite.h"
+#include "formats/OverlayLoader.h"
+#include "formats/IPDWrite.h"
 #include "viewport/LocalGeometry.h"
 #include "viewport/Viewport.h"
 #include "viewport/Waypoints.h"

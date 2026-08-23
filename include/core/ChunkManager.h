@@ -5,7 +5,7 @@
 #include <mutex>
 #include <set>
 #include "core/AssetManager.h"
-#include "core/Structs.h"
+#include "formats/Structs.h"
 #include "core/OBJ.h"
 #include "core/Patcher.h"
 

@@ -3,7 +3,7 @@
 #include "viewport/Waypoints.h"
 #include "core/Config.h"
 #include "core/Textures.h"
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 #include "extras/IconsFontAwesome6.h"
 #include "raymath.h"
 #include <algorithm>

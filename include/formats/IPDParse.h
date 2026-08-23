@@ -197,10 +197,6 @@ public:
         int mesh_id;         // position index in PLM obj_headers array
         int pack_count;      // total pack count across all submeshes
     };
-    static bool ParseGlbFile(const std::string&             glbPath,
-                              std::vector<RenderObject>&     outObjects,
-                              std::vector<std::string>&      outTexNames,
-                              std::vector<GlbObjectInfo>&    outInfo);
 
 private:
     // Parse one PLM section (embedded or standalone file).

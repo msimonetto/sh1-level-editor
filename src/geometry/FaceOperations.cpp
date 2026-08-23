@@ -3,7 +3,7 @@
 #include "viewport/LocalGeometry.h"
 #include "panels/TextureMap.h"
 #include "core/History.h"
-#include "core/IPDWrite.h"
+#include "formats/IPDWrite.h"
 #include "raymath.h"
 #include <algorithm>
 #include <cmath>

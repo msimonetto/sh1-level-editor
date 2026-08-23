@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "viewport/ViewportBase.h"
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 #include "core/Textures.h"
 #include "raylib.h"
 

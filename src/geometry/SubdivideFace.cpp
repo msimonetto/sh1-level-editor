@@ -1,7 +1,7 @@
 #include "geometry/SubdivideFace.h"
 #include "viewport/LocalGeometry.h"
 #include "core/History.h"
-#include "core/IPDWrite.h"
+#include "formats/IPDWrite.h"
 #include "raymath.h"
 #include <filesystem>
 #include <algorithm>

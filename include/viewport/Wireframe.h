@@ -5,7 +5,7 @@
 #include "rlgl.h"
 #include "viewport/ViewportBase.h"  // LoadedChunk
 #include "viewport/Frustum.h"
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 
 // Forward declarations
 struct SelectedFace;

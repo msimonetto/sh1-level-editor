@@ -2,7 +2,7 @@
 #include "geometry/ChunkValidator.h"
 #include "core/Config.h"
 #include "core/History.h"
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 #include "core/Textures.h"
 #include "panels/TextureMap.h"
 #include "viewport/Viewport.h"

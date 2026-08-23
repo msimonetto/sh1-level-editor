@@ -1,6 +1,6 @@
 #pragma once
-#include "core/IPDParse.h"
-#include "core/OverlayLoader.h"
+#include "formats/IPDParse.h"
+#include "formats/OverlayLoader.h"
 #include <deque>
 #include <string>
 

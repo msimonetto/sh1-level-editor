@@ -1,5 +1,5 @@
 #pragma once
-#include "core/OverlayLoader.h"
+#include "formats/OverlayLoader.h"
 #include "viewport/ViewportBase.h"
 #include "viewport/ViewportOverlay.h"
 class Viewport;

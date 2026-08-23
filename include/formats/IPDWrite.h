@@ -1,5 +1,5 @@
 #pragma once
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -56,21 +56,12 @@ private:
     // counts changed. Then encode all vertices and faces (including new ones) back
     // into the shifted buffer. Relocates all subsequent offsets automatically.
     // Returns the number of faces patched/encoded.
-    // -----------------------------------------------------------------------
-    static int UpdateMeshStructure(std::vector<uint8_t>& buf,
-                                   const ParsedChunk& chunk,
-                                   bool isGlobalFile);
 
     // Encode one RenderFace's UV/CBA/texnum AND vertex indices back into the
-    // working buffer at the specified absolute byte offset `pkOff`.
-    static void EncodeFaceAtOffset(std::vector<uint8_t>& buf, const RenderFace& face, int pkOff);
 
     // Reverse the UV bias and re-encode normalised float UVs to uint8.
     // bias: the original rawU/rawV arrays are used to detect which vertex had
     // bias applied (+1). The bias is subtracted before rounding, then clamped
-    // to [0, 255]. This preserves uint8 precision matching the game's data type.
-    static void EncodeUVs(const RenderFace& face,
-                          uint8_t outU[4], uint8_t outV[4]);
 
     // -----------------------------------------------------------------------
     // Section-relocation path (stubs — future: vertex/face addition support)
@@ -89,20 +80,11 @@ private:
 
     // Same as above for a standalone PLM file (e.g. _GLB.PLM).
     // Adjusts: PLM_FILE_HEADER offsets, PLM_OBJ_HEADER.data_offset,
-    //          PLM_DATA_HEADER offset fields.
-    static void RelocatePLMOffsets(std::vector<uint8_t>& buf,
-                                   int insertionPoint,
-                                   int delta,
-                                   int plmBase = 0);
 
     // Re-derive the byte offset of a PLM_PACK_HEADER by navigating the live
     // working buffer using FaceAddress logical indices.
     // Used to refresh stale packRawOffset caches after a relocation, and as a
     // consistency check (debug builds).
-    // Returns -1 on failure (object not found, index out of range).
-    static int ResolveFaceOffset(const std::vector<uint8_t>& buf,
-                                 const FaceAddress& addr,
-                                 int plmBase);
 
     // -----------------------------------------------------------------------
     // Utility

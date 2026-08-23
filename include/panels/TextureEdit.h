@@ -2,8 +2,8 @@
 #include "imgui.h"
 #include "raylib.h"
 #include "core/Textures.h"
-#include "core/structs.h"
-#include "core/IPDParse.h"
+#include "formats/Structs.h"
+#include "formats/IPDParse.h"
 
 class TextureEditPanel {
 public:

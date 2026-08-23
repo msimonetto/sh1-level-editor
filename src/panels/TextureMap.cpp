@@ -4,8 +4,8 @@
 #include "core/FileDialog.h"
 #include "core/ChunkManager.h"
 #include "core/DependencyManager.h"
-#include "core/IPDParse.h"
-#include "core/IPDWrite.h"
+#include "formats/IPDParse.h"
+#include "formats/IPDWrite.h"
 #include "imgui_internal.h"
 #include "extras/IconsFontAwesome6.h"
 #include <algorithm>

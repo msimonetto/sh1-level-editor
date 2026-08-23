@@ -2,7 +2,7 @@
 #include "core/ChunkManager.h"
 #include "core/History.h"
 #include "core/Textures.h"
-#include "core/structs.h"
+#include "formats/Structs.h"
 #include "imgui.h"
 #include "raylib.h"
 #include "viewport/LocalGeometry.h"

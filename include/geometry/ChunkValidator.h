@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "core/IPDParse.h"
+#include "formats/IPDParse.h"
 #include "raylib.h"
 
 // ---------------------------------------------------------------------------

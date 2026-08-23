@@ -1,7 +1,7 @@
 #include "panels/Waypoints.h"
 #include "core/History.h"
 #include "imgui.h"
-#include "core/OverlayLoader.h"
+#include "formats/OverlayLoader.h"
 #include <vector>
 #include <string>
 #include <cstdio>

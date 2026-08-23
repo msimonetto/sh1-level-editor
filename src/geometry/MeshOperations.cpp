@@ -1,7 +1,7 @@
 #include "geometry/MeshOperations.h"
 #include "geometry/ChunkValidator.h"
 #include "core/History.h"
-#include "core/IPDWrite.h"
+#include "formats/IPDWrite.h"
 #include "raymath.h"
 #include <cmath>
 #include <cstdio>

@@ -1,6 +1,6 @@
 #include "core/ChunkManager.h"
-#include "core/IPDParse.h"
-#include "core/OverlayLoader.h"
+#include "formats/IPDParse.h"
+#include "formats/OverlayLoader.h"
 #include "core/Textures.h"
 #include "viewport/Collision.h"
 #include "viewport/LocalGeometry.h"
