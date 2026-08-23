@@ -6,11 +6,7 @@
 #include <mutex>
 #include "raylib.h"
 #include "formats/Structs.h"
-
-struct TIMPalette {
-    std::vector<Color> colors;
-};
-
+#include "formats/TIMDecoder.h"
 class Textures {
 public:
     Textures();
@@ -26,12 +22,12 @@ public:
     // For ImGui rendering
     Texture2D GetTexture() const { return m_texture; }
     
-    int GetWidth() const { return m_width; }
-    int GetHeight() const { return m_height; }
-    int GetBpp() const { return m_bpp; }
+    int GetWidth() const { return m_decoded.width; }
+    int GetHeight() const { return m_decoded.height; }
+    int GetBpp() const { return m_decoded.bpp; }
     
-    const std::vector<uint8_t>& GetRawIndices() const { return m_rawIndices; }
-    const std::vector<TIMPalette>& GetPalettes() const { return m_palettes; }
+    const std::vector<uint8_t>& GetRawIndices() const { return m_decoded.rawIndices; }
+    const std::vector<TIMPalette>& GetPalettes() const { return m_decoded.palettes; }
 
     // Apply a different CLUT to the texture and upload to GPU
     void ApplyPalette(int paletteIndex);
@@ -45,14 +41,7 @@ private:
     Texture2D m_texture; // Raylib GPU texture
     Image m_image;       // Raylib CPU image (RGBA8888)
 
-    int m_width;
-    int m_height;
-    int m_bpp; // 0=4-bit, 1=8-bit, 2=16-bit, 3=24-bit
-    
-    std::vector<uint8_t> m_rawIndices; // Stored indices for 4-bit / 8-bit
-    std::vector<TIMPalette> m_palettes;
-    
-    Color WordToColor(uint16_t word);
+    DecodedTIM m_decoded;
 };
 
 // ---------------------------------------------------------------------------
