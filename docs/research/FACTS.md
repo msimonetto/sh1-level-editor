@@ -8,19 +8,19 @@ All entries below are backed by decompiled source code (PC port decomp), reprodu
 
 - **File type code:** In the game's format table, `.IPD` is type code 6, denoting map/world geometry data.
 - **Endianness:** All integer and float values in IPD files use little-endian byte order (PS1 MIPS R3000 CPU is LE), confirmed by matching test values to known coordinates via `sh_ipd2obj` source code.
-- **IPD_FILE_HEADER size:** 84 bytes (`0x54`). Supported by `struct.calcsize` matching the hand-summed field sizes and the decomp's own comment: "all offsets += sizeof(IPD_FILE_HEADER) (0x54)".
-- **IPD_POS_HEADER size:** 24 bytes. Supported by stride arithmetic across all groups.
-- **IPD_OBJ_DATA size:** 36 bytes. Supported by data-offset deltas across all instances.
-- **IPD_OBJNAME_DATA size:** 16 bytes. Supported by `16 * dta.obj_id` indexing in `main.c` and binary layout.
-- **Position header stride:** `hpos(i) = obj_data_offset + 24 * i`, observed for all 19 groups in THR0000.IPD with zero deviations.
-- **Object instance stride:** `dpos(j) = data_offset + 36 * j`, observed for all instances across all 19 groups (dpos deltas = 36 bytes, zero deviations).
-- **Object name table offset (`obj_name_offset`):** Dynamically calculated based on section counts. In `THR0000.IPD`, `obj_name_offset = 0x0188` (392 decimal), containing 19 entries of 16 bytes each.
-- **Object data offset (`obj_data_offset`):** Dynamic. In `THR0000.IPD`, observed at `0x02B8` (696 decimal), verified by both stride arithmetic and binary dump.
-- **`IPD_OBJ_DATA.pad` field:** Always `0x0000` across all parsed instances and all tested IPD files. Natural C struct alignment padding.
-- **Global object flag:** In `IPD_OBJNAME_DATA`, `flag=0` means the mesh lives in the IPD's embedded PLM section; `flag=1` means it lives in the separate `_GLB.PLM` file. Matches logic in `main.c` and binary dumps.
-- **`unk2` / `unk3` in IPD_POS_HEADER are NOT zero:** Binary dump shows non-zero values (e.g. `0x07FF0000`, `0x0FFF0800`). These fields carry real data and should not be treated as padding.
-- **8-byte sub-blocks between OBJ_DATA arrays:** Each `IPD_POS_HEADER.unk2_offset` (and `unk1_offset` when `unk1_num > 0`) points to an 8-byte block immediately following the corresponding `IPD_OBJ_DATA` array. When `unk1_num = 0`, `unk1_offset == unk2_offset` (same pointer). Confirmed by gap analysis and round-trip tests.
-- **`unkdata_offset` is non-zero:** Points to a valid dynamic address (e.g. `0x09D4` in `THR0000.IPD`), falling inside the data region between the position array and the PLM section. Content appears unread by `sh_ipd2obj`.
+- **`s_IpdHeader` size:** 84 bytes (`0x54`). Supported by `STATIC_ASSERT_SIZEOF(s_IpdHeader, 84)` in `ipd.h`. *(Note: These sizes apply to the 32-bit PSX on-disk layout used by modders. On 64-bit PC builds, `ipd_reformat.c` dynamically expands these structs in memory to accommodate 64-bit pointers.)*
+- **`s_IpdModelBuffer` size:** 24 bytes. Supported by `STATIC_ASSERT_SIZEOF(s_IpdModelBuffer, 24)` in `ipd.h`. (Previously referred to as `IPD_POS_HEADER`).
+- **`s_IpdModelInstance` size:** 36 bytes. Supported by `STATIC_ASSERT_SIZEOF(s_IpdModelInstance, 36)` in `ipd.h`. (Previously referred to as `IPD_OBJ_DATA`).
+- **`s_IpdModelInfo` size:** 16 bytes. Supported by `STATIC_ASSERT_SIZEOF(s_IpdModelInfo, 16)` in `ipd.h`. (Previously referred to as `IPD_OBJNAME_DATA`).
+- **Model buffer stride:** `modelBuffers(i) = base + 24 * i`.
+- **Model instance stride:** `modelInstances(j) = base + 36 * j`.
+- **Model info table offset (`modelInfo`):** Dynamically calculated based on section counts.
+- **Model buffer offset (`modelBuffers`):** Dynamic.
+- **`s_IpdModelInstance.mat` padding field:** Always `0x0000` across all parsed instances. Natural C struct alignment padding for the `MATRIX`.
+- **Global object flag:** In `s_IpdModelInfo`, `isGlobalPlm=0` means the mesh lives in the IPD's embedded PLM section; `isGlobalPlm=1` means it lives in the separate `_GLB.PLM` file.
+- **`minX`/`maxX`/`minZ`/`maxZ` in `s_IpdModelBuffer` are NOT zero:** These are bounding box extents (Q7.8 fixed point), previously referred to as `unk2` / `unk3`.
+- **`field_10` and `subcellPositions` blocks:** Each `s_IpdModelBuffer` contains pointers at 0x10 and 0x14 pointing to array data (XZ positions and unknown collision data).
+- **`modelOrderList` is non-zero:** Points to a valid dynamic address for the object ordering array (previously known as `unkdata_offset`).
 - **All struct sizes:** All 9 IPD/PLM structs pass `struct.calcsize` self-test against hand-derived totals from `main.c`.
 - **Round-trip:** All 5 sample IPD files (THR0000–THR0004) pass byte-identical decode/re-encode using observed structs + opaque gap blobs. No byte is lost.
 
@@ -42,10 +42,9 @@ All entries below are backed by decompiled source code (PC port decomp), reprodu
 
 ## Collision System
 
-- **Collision Header (`s_IpdCollisionData`):** The 308-byte region starting at `0x0054` is the `s_IpdCollisionData` struct. It contains internal pointers and counts defining 7 separate arrays (splitVertices, surfaces, subcells, unkBlock3, broadphase grid, block5, block6).
-- **Collision Broadphase Grid:** The `grid` pointer (offset `0x20` into the collision header) points to an array of `s_IpdCollSubcellRange` elements (4 bytes each). This represents the map's spatial partitioning (often 20×20, given by `gridWidth × gridHeight`). These ranges point into `ptr_block5`, not `subcellCheckIdx`. The `subcellCheckIdx` buffer (embedded at `0x34` / 0x88) is a completely separate per-frame dedup counter array.
-- **Collision Subcells (`s_IpdCollSubcell`):** Exactly 10 bytes: 3 packed `short` values followed by 4 `u8` values. Byte layout confirmed by round-trip.
-- **Collision Subcell Meaning (RESOLVED):** `field_0` packs an X coordinate (lower 14 bits, sign-extended). `field_2` packs a Y height (lower 14 bits, sign-extended). `field_4` is a raw 16-bit Z coordinate. The trailing 4 bytes are flat `u8` indices (`splitVertexIdx0`, `splitVertexIdx1`, `surfaceIdx0`, `surfaceIdx1`) into the `splitVertices` and `surfaces` arrays. `0xFF` acts as a NULL/impassable surface flag.
+- **Collision Header (`s_IpdCollisionData`):** The 308-byte struct starting at `0x0054` is `s_IpdCollisionData`. It contains pointers and counts defining several arrays (`splitVertices`, `surfaces`, `subcells`, `ptr_18`, `subcellRanges`, `ptr_28`, `ptr_2C`, `subcellCheckIdx`).
+- **Collision Spatial Grid (`subcellRanges`):** The `subcellRanges` pointer (offset `0x20` into the collision header) points to an array of `s_IpdCollSubcellRange` elements (4 bytes each). This represents the map's spatial partitioning, dimensioned by `subcellCountX` and `subcellCountZ`. (This explicitly refutes previous assumptions of a hardcoded 20×20 broadphase grid).
+- **Collision Subcells (`s_IpdCollSubcell`):** Exactly 10 bytes. The first 6 bytes pack X, Y, and Z coordinates along with ID flags, followed by 4 `u8` indices (`splitVertexIdx0`, `splitVertexIdx1`, `surfaceIdx0`, `surfaceIdx1`) into the `splitVertices` and `surfaces` arrays.
 - **Collision Walls vs Floors:** The 2.5D grid does not construct 3D boxes. Walls are rendered by extruding the 2D line segment between `splitVertexIdx0` and `splitVertexIdx1` vertically on the Y-axis when the surface is impassable (`0xFF` or `disableHeight = true`). Floors are derived from the broadphase grid and the `baseGroundHeight` of the active surface.
 - **Dual collision systems:** IPD collision (2.5D heightfield in `.IPD` chunks) and overlay collision triggers (`s_CollisionTrigger` in the map overlay) are two completely separate, complementary systems. IPD handles continuous sloped planes and wall extrusions. Overlay triggers handle discrete step-height snapping for stairs, kerbs, and ledges via AABBs.
 
