@@ -251,7 +251,7 @@ bool IPDParse::Parse(const std::string& ipdPath,
         localObjMap[std::string(name)] = off;
     }
 
-    // --- Optionally load the Global PLM (_GLB.PLM) via GlbCache ---
+    // --- Optionally load the Global PLM (_GLB.PLM) via GlobalCache ---
     // Flag=1 entries reference objects in {PREFIX}_GLB.PLM.
     // We only attempt this if at least one flag=1 entry exists.
     bool needsGlobal = false;
@@ -259,7 +259,7 @@ bool IPDParse::Parse(const std::string& ipdPath,
         if (e.flag == 1) { needsGlobal = true; break; }
     }
 
-    std::shared_ptr<const CachedGlb> glbData;
+    std::shared_ptr<const CachedGlobal> glbData;
     if (needsGlobal) {
         // Try workspace/PLM/{PREFIX}_GLB.PLM
         std::string glbPath = workspaceDir + "/PLM/" + out.chunkPrefix + "_GLB.PLM";
@@ -268,7 +268,7 @@ bool IPDParse::Parse(const std::string& ipdPath,
             std::string ipdDir = ipdPath.substr(0, slash != std::string::npos ? slash + 1 : 0);
             glbPath = ipdDir + out.chunkPrefix + "_GLB.PLM";
         }
-        glbData = GlbCache::Get().GetOrLoad(glbPath);
+        glbData = GlobalCache::Get().GetOrLoad(glbPath);
         if (glbData && glbData->loaded) {
             out.globalTexNames = glbData->globalTexNames;
         } else {

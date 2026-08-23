@@ -137,7 +137,7 @@ void FileManager::ScanAssets() {
 bool FileManager::ExtractToWorkspace(const std::vector<std::string>& chunks, const std::string& completeDir, const std::string& workspaceDir, const std::string& projectDir) {
     Log("[EXTRACT] Starting native C++ extraction to workspace...");
     
-    GlbCache::Get().Clear();
+    GlobalCache::Get().Clear();
     
     fs::path compDir = fs::path(completeDir);
     fs::path workDir = fs::path(workspaceDir);
@@ -368,7 +368,7 @@ bool FileManager::ClearEntire(const std::string& targetType, const std::string& 
         DependencyManager depMgr(workspaceDir);
         depMgr.m_dependenciesData.clear();
         depMgr.Save();
-        GlbCache::Get().Clear();
+        GlobalCache::Get().Clear();
     } else {
         ClearDir(fs::path(overrideDir) / "BG");
     }

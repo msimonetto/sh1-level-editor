@@ -129,16 +129,28 @@ Low-level parser for PlayStation 1 `.IPD` (world geometry) and standalone `_GLB.
 - **`IPDParse`**:
   - `Parse(ipdPath, workspaceDir, outChunk)`: Parses complete `.IPD` file and associated `_GLB.PLM`.
   - `BuildBatches(chunk)`: Flattens object geometry into GPU-ready draw batches.
-### `PLMParse.h`
-Parser and in-memory cache for PlayStation 1 `.PLM` models and standalone `_GLB.PLM` binary asset libraries.
-- **`CachedGlb`**: In-memory representation of a loaded global PLM library (`path`, `buffer`, `globalTexNames`, `globalObjMap`).
-- **`GlbCache`**: Thread-safe singleton registry caching `_GLB.PLM` buffers in RAM to eliminate redundant disk I/O and duplicate parsing across chunks.
+### `GlobalCache.h`
+Thread-safe in-memory cache for PlayStation 1 `_GLB.PLM` binary asset libraries.
+- **`CachedGlobal`**: In-memory representation of a loaded global PLM library (`path`, `buffer`, `globalTexNames`, `globalObjMap`).
+- **`GlobalCache`**: Singleton registry caching `_GLB.PLM` buffers in RAM to eliminate redundant disk I/O and duplicate parsing across chunks.
   - `GetOrLoad(glbPath)`: Fetches cached global PLM or reads from disk once.
   - `Invalidate(glbPath)`: Evicts modified file from cache on save.
   - `Clear()`: Flushes all cached GLB files on workspace lifecycle operations.
-- **`PLMParse`**:
-  - `ParseAndPlaceObject(...)`: Parses individual PLM object headers and applies 3D fixed-point world transform matrices.
-  - `ParseGlbFile(glbPath, outObjects, outTexNames, outInfo)`: Standalone parser for global PLM asset libraries.
+
+### `IPDParse.h`
+Low-level parser for PlayStation 1 `.IPD` (world geometry) and standalone `_GLB.PLM` binary files.
+- **Coordinate System Constants**: `IPD_SCALE = 1.0f / 256.0f`, `IPD_MAP_MAX = 10240.0f`.
+- **`DeriveChunkPrefix(name)`**: Utility to extract prefix from standard 8-character chunk names.
+- **`FaceAddress`**: Canonical address of a polygon in binary (`plmObjectName`, `meshIdx`, `packIdx`, `isGlobal`, `packRawOffset`).
+- **`RenderFace`**: Decoded polygon primitive containing vertex indices `v[4]`, normalized `uv[4][2]`, `paletteRow`, `texNum`, `texName`, raw UV bytes `rawU[4]`/`rawV[4]`, normal indices, and raw CBA words.
+- **`RenderMesh`**: Container for local vertex arrays `(vx, vy, vz)` and constituent `faces`.
+- **`RenderObject`**: Placed 3D model instance (`PLM_OBJ_HEADER`) with local meshes, world transform matrix `rt[3][3]`, translation `(rawTx, rawTy, rawTz)`, bounding box, and `.IPD` file offset.
+- **`RenderBatch`**: Geometry grouped by `(texName, paletteRow)` with interleaved positions and UVs for fast GPU rendering.
+- **`ParsedCollision`**: Extracted physics collision data (`splitVertices`, `surfaces`, `subcells`, `grid`, and indirection tables).
+- **`ParsedChunk`**: Top-level chunk structure containing collision, local/global texture names, placed objects, and render batches.
+- **`IPDParse`**:
+  - `Parse(ipdPath, workspaceDir, outChunk)`: Parses complete `.IPD` file and associated `_GLB.PLM`.
+  - `BuildBatches(chunk)`: Flattens object geometry into GPU-ready draw batches.
 
 ### `IPDWrite.h`
 Intelligent section-aware binary patch writer that writes in-memory geometry edits back to `.IPD` and `.PLM` files.
@@ -176,6 +188,12 @@ Executable patcher for PlayStation executable binaries (e.g. `SLUS_007.07`).
   - `RevertMemoryAllocations(exePath, version)`: Restores vanilla binary bytes.
   - `CheckPatchingRequired(exePath, version)`: Verifies patch status.
 
+### `PLMParse.h`
+Parser for PlayStation 1 `.PLM` models and standalone `_GLB.PLM` binary asset libraries.
+- **`PLMParse`**:
+  - `ParseAndPlaceObject(...)`: Parses individual PLM object headers and applies 3D fixed-point world transform matrices.
+  - `ParseGlbFile(glbPath, outObjects, outTexNames, outInfo)`: Standalone parser for global PLM asset libraries.
+
 ### `Shortcuts.h`
 Global keyboard shortcut router.
 - **`Shortcuts`**:
@@ -189,17 +207,23 @@ Header-only definitions of packed PlayStation 1 C-style binary structs (`#pragma
 - Collision Structures: `IPD_COLL_HEADER`, `IPD_COLL_SVECTOR`, `IPD_COLL_SURFACE`, `IPD_COLL_SUBCELL`.
 - Director / Event Structures: `MapPoint2d`, `EventData`.
 
+### `TextureCache.h`
+Thread-safe in-memory GPU texture cache and registry for the 3D viewport.
+- **`TextureCache`**:
+  - Singleton caching Raylib GPU `Texture2D` instances for all loaded workspace textures to prevent redundant VRAM allocations.
+  - `Fetch(texName, paletteRow, workspaceDir)`: Retrieves or loads texture from disk.
+  - `Preload(texName, workspaceDir)`: Worker-thread friendly background loading.
+  - `GetDimensions(texName, workspaceDir, w, h)`: Retrieves texture dimensions.
+  - `UnloadAll()`: Cleans up GPU memory on exit or reload.
+
 ### `Textures.h`
-PlayStation `.TIM` texture loader, CLUT palette manager, and GPU texture cache.
+PlayStation `.TIM` texture loader and CLUT palette manager.
 - **`TIMPalette`**: Represents 16-color or 256-color palette data.
 - **`Textures`**:
   - `Load(path)`, `Unload()`: Loads raw `.TIM` images.
   - `SaveToPNG()`, `LoadFromPNG()`: Converts TIM to PNG and vice versa.
   - `BuildPaletteTexture()`: Generates GPU texture using selected CLUT row.
-- **`TextureCache`**:
-  - Singleton caching Raylib GPU `Texture2D` instances for all loaded workspace textures to prevent redundant VRAM allocations.
-  - `Fetch(texName, paletteRow, workspaceDir)`: Retrieves or loads texture from disk.
-  - `UnloadAll()`: Cleans up GPU memory on exit or reload.
+
 
 ---
 

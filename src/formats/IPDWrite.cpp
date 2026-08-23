@@ -217,7 +217,7 @@ bool IPDWrite::WriteChunk(const std::string& ipdPath,
                 if (!WriteFileAtomic(glbPath, glbBuf)) return false;
                 totalPatched += n;
                 anyWritten = true;
-                GlbCache::Get().Invalidate(glbPath);
+                GlobalCache::Get().Invalidate(glbPath);
                 printf("[IPDWrite] Patched %d global face(s) in %s\n", n, glbPath.c_str());
             }
         }
