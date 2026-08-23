@@ -32,6 +32,9 @@
 #include <cstring>
 #include <algorithm>
 #include <map>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -248,7 +251,7 @@ bool IPDParse::Parse(const std::string& ipdPath,
         localObjMap[std::string(name)] = off;
     }
 
-    // --- Optionally load the Global PLM (_GLB.PLM) ---
+    // --- Optionally load the Global PLM (_GLB.PLM) via GlbCache ---
     // Flag=1 entries reference objects in {PREFIX}_GLB.PLM.
     // We only attempt this if at least one flag=1 entry exists.
     bool needsGlobal = false;
@@ -256,59 +259,19 @@ bool IPDParse::Parse(const std::string& ipdPath,
         if (e.flag == 1) { needsGlobal = true; break; }
     }
 
-    std::vector<uint8_t> glbBuf;
-    std::map<std::string, int> globalObjMap;
-    bool glbLoaded = false;
-
+    std::shared_ptr<const CachedGlb> glbData;
     if (needsGlobal) {
         // Try workspace/PLM/{PREFIX}_GLB.PLM
         std::string glbPath = workspaceDir + "/PLM/" + out.chunkPrefix + "_GLB.PLM";
-        FILE* gf = fopen(glbPath.c_str(), "rb");
-        if (!gf) {
+        if (!fs::exists(glbPath)) {
             // Fallback: same directory as IPD
             std::string ipdDir = ipdPath.substr(0, slash != std::string::npos ? slash + 1 : 0);
             glbPath = ipdDir + out.chunkPrefix + "_GLB.PLM";
-            gf = fopen(glbPath.c_str(), "rb");
         }
-        if (gf) {
-            fseek(gf, 0, SEEK_END);
-            long gsz = ftell(gf);
-            fseek(gf, 0, SEEK_SET);
-            glbBuf.resize(gsz);
-            if (fread(glbBuf.data(), 1, gsz, gf) == (size_t)gsz) {
-                glbLoaded = true;
-                printf("[IPDParse] Loaded GLB: %s\n", glbPath.c_str());
-            }
-            fclose(gf);
-        }
-
-        if (glbLoaded && glbBuf.size() >= sizeof(PLM_FILE_HEADER)) {
-            const PLM_FILE_HEADER* gh = (const PLM_FILE_HEADER*)glbBuf.data();
-            if (gh->id == 0x0630) {
-                // Global texture names
-                int gTexBase = gh->tex_name_offset;
-                for (int i = 0; i < gh->tex_num; ++i) {
-                    int off = gTexBase + i * 24;
-                    if (off + 24 > (int)glbBuf.size()) break;
-                    char name[25] = {0};
-                    memcpy(name, glbBuf.data() + off, 24);
-                    out.globalTexNames.push_back(std::string(name));
-                }
-                // Build global obj lookup
-                int gObjBase = gh->obj_start_offset;
-                for (int i = 0; i < gh->obj_num; ++i) {
-                    int off = gObjBase + i * (int)sizeof(PLM_OBJ_HEADER);
-                    if (off + (int)sizeof(PLM_OBJ_HEADER) > (int)glbBuf.size()) break;
-                    const PLM_OBJ_HEADER* oh = (const PLM_OBJ_HEADER*)(glbBuf.data() + off);
-                    char name[9] = {0};
-                    memcpy(name, oh->name, 8);
-                    globalObjMap[std::string(name)] = off;
-                }
-            } else {
-                printf("[IPDParse] GLB PLM magic mismatch (0x%04X), skipping global objects\n", gh->id);
-                glbLoaded = false;
-            }
-        } else if (needsGlobal) {
+        glbData = GlbCache::Get().GetOrLoad(glbPath);
+        if (glbData && glbData->loaded) {
+            out.globalTexNames = glbData->globalTexNames;
+        } else {
             printf("[IPDParse] Warning: chunk %s needs global PLM but '%s_GLB.PLM' not found\n",
                    out.chunkName.c_str(), out.chunkPrefix.c_str());
         }
@@ -348,12 +311,14 @@ bool IPDParse::Parse(const std::string& ipdPath,
             ComputeWorldRotation(*dta, rot);
 
             // --- Look up the PLM object ---
-            const std::map<std::string, int>& objMap = isGlobal ? globalObjMap : localObjMap;
-            const std::vector<uint8_t>& srcBuf = isGlobal ? glbBuf : buf;
+            static const std::map<std::string, int> s_emptyMap;
+            const std::map<std::string, int>& objMap = isGlobal ? (glbData ? glbData->globalObjMap : s_emptyMap) : localObjMap;
+            const uint8_t* srcBufData = isGlobal ? (glbData ? glbData->buffer.data() : nullptr) : buf.data();
+            size_t srcBufSize = isGlobal ? (glbData ? glbData->buffer.size() : 0) : buf.size();
             const std::vector<std::string>& texNames = isGlobal ? out.globalTexNames : out.localTexNames;
             int srcPlmBase = isGlobal ? 0 : plmBase; // GLB file base is 0; IPD embedded PLM uses plmBase
 
-            if (!isGlobal || glbLoaded) {
+            if (!isGlobal || (glbData && glbData->loaded)) {
                 auto it = objMap.find(objName);
                 if (it == objMap.end()) {
                     // Object name not found in PLM (can happen for non-existent GLB references)
@@ -364,10 +329,10 @@ bool IPDParse::Parse(const std::string& ipdPath,
                 }
 
                 int objHdrOff = it->second;
-                const PLM_OBJ_HEADER* objHdr = (const PLM_OBJ_HEADER*)(srcBuf.data() + objHdrOff);
+                const PLM_OBJ_HEADER* objHdr = (const PLM_OBJ_HEADER*)(srcBufData + objHdrOff);
 
                 RenderObject robj;
-                if (PLMParse::ParseAndPlaceObject(srcBuf.data(), srcBuf.size(),
+                if (PLMParse::ParseAndPlaceObject(srcBufData, srcBufSize,
                                          srcPlmBase, objHdr, texNames,
                                          isGlobal, worldTx, worldTy, worldTz, rot, dta,
                                          robj))

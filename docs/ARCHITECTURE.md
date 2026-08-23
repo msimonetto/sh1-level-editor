@@ -129,6 +129,15 @@ Low-level parser for PlayStation 1 `.IPD` (world geometry) and standalone `_GLB.
 - **`IPDParse`**:
   - `Parse(ipdPath, workspaceDir, outChunk)`: Parses complete `.IPD` file and associated `_GLB.PLM`.
   - `BuildBatches(chunk)`: Flattens object geometry into GPU-ready draw batches.
+### `PLMParse.h`
+Parser and in-memory cache for PlayStation 1 `.PLM` models and standalone `_GLB.PLM` binary asset libraries.
+- **`CachedGlb`**: In-memory representation of a loaded global PLM library (`path`, `buffer`, `globalTexNames`, `globalObjMap`).
+- **`GlbCache`**: Thread-safe singleton registry caching `_GLB.PLM` buffers in RAM to eliminate redundant disk I/O and duplicate parsing across chunks.
+  - `GetOrLoad(glbPath)`: Fetches cached global PLM or reads from disk once.
+  - `Invalidate(glbPath)`: Evicts modified file from cache on save.
+  - `Clear()`: Flushes all cached GLB files on workspace lifecycle operations.
+- **`PLMParse`**:
+  - `ParseAndPlaceObject(...)`: Parses individual PLM object headers and applies 3D fixed-point world transform matrices.
   - `ParseGlbFile(glbPath, outObjects, outTexNames, outInfo)`: Standalone parser for global PLM asset libraries.
 
 ### `IPDWrite.h`

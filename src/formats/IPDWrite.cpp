@@ -1,6 +1,7 @@
 #include "formats/IPDWrite.h"
 #include "formats/Structs.h"
 #include "formats/PLMWrite.h"
+#include "formats/PLMParse.h"
 #include "raylib.h"
 #include <cstdio>
 #include <cstring>
@@ -216,6 +217,7 @@ bool IPDWrite::WriteChunk(const std::string& ipdPath,
                 if (!WriteFileAtomic(glbPath, glbBuf)) return false;
                 totalPatched += n;
                 anyWritten = true;
+                GlbCache::Get().Invalidate(glbPath);
                 printf("[IPDWrite] Patched %d global face(s) in %s\n", n, glbPath.c_str());
             }
         }
