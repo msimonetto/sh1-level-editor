@@ -1,5 +1,7 @@
 #include "core/DependencyManager.h"
 #include <fstream>
+#include <iostream>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -9,113 +11,135 @@ DependencyManager::DependencyManager(const std::string& workspaceDir)
 }
 
 void DependencyManager::Load() {
-    LoadJSON(m_workspaceDir + "/dependencies.json", m_dependencies);
-    LoadJSON(m_workspaceDir + "/dependents.json", m_dependents);
+    m_dependenciesData.clear();
+    fs::path depsPath = fs::path(m_workspaceDir) / "dependencies.json";
+    if (fs::exists(depsPath)) {
+        std::ifstream file(depsPath);
+        if (file.is_open()) {
+            try {
+                nlohmann::json root;
+                file >> root;
+                for (auto it = root.begin(); it != root.end(); ++it) {
+                    m_dependenciesData[it.key()] = it.value();
+                }
+            } catch (const nlohmann::json::parse_error& e) {
+                std::cerr << "[DependencyManager] JSON Parse Error: " << e.what() << "\n";
+            }
+        }
+    }
 }
 
 void DependencyManager::Save() {
-    SaveJSON(m_workspaceDir + "/dependencies.json", m_dependencies);
-    SaveJSON(m_workspaceDir + "/dependents.json", m_dependents);
+    fs::path depsPath = fs::path(m_workspaceDir) / "dependencies.json";
+    std::ofstream file(depsPath);
+    if (file.is_open()) {
+        nlohmann::json root;
+        for (const auto& [chunkName, data] : m_dependenciesData) {
+            root[chunkName] = data;
+        }
+        file << root.dump(4);
+    }
 }
 
 void DependencyManager::LoadIPDDependencies(const std::string& prefix, const std::vector<std::string>& ipdNames) {
+    Load(); // Reload from disk in case it was modified by a background thread
+    
     m_activeTextures.clear();
     m_activePLMs.clear();
 
-    if (m_dependencies.find(prefix) == m_dependencies.end()) {
-        return;
-    }
-
-    const auto& prefixDeps = m_dependencies[prefix];
     for (const auto& ipdName : ipdNames) {
-        std::string ipdKey = ipdName;
-        if (ipdKey.find(".IPD") == std::string::npos && ipdKey.find(".ipd") == std::string::npos) {
-            ipdKey += ".IPD"; 
+        std::string chunkKey = ipdName;
+        // Strip .IPD extension if present
+        if (chunkKey.length() > 4 && chunkKey.substr(chunkKey.length() - 4) == ".IPD") {
+            chunkKey = chunkKey.substr(0, chunkKey.length() - 4);
+        } else if (chunkKey.length() > 4 && chunkKey.substr(chunkKey.length() - 4) == ".ipd") {
+            chunkKey = chunkKey.substr(0, chunkKey.length() - 4);
         }
 
-        if (prefixDeps.find(ipdKey) != prefixDeps.end()) {
-            for (const auto& dep : prefixDeps.at(ipdKey)) {
-                if (dep.find(".TIM") != std::string::npos || dep.find(".tim") != std::string::npos) {
-                    m_activeTextures.insert(dep.substr(0, dep.length() - 4));
-                } else if (dep.find(".PLM") != std::string::npos || dep.find(".plm") != std::string::npos) {
-                    m_activePLMs.insert(dep);
+        if (m_dependenciesData.find(chunkKey) != m_dependenciesData.end()) {
+            const auto& chunkData = m_dependenciesData[chunkKey];
+            if (chunkData.contains("textures")) {
+                for (const auto& tex : chunkData["textures"]) {
+                    std::string texName = tex.get<std::string>();
+                    // active textures expect names without extension
+                    if (texName.length() > 4 && texName.substr(texName.length() - 4) == ".TIM") {
+                        m_activeTextures.insert(texName.substr(0, texName.length() - 4));
+                    } else if (texName.length() > 4 && texName.substr(texName.length() - 4) == ".tim") {
+                        m_activeTextures.insert(texName.substr(0, texName.length() - 4));
+                    } else {
+                        m_activeTextures.insert(texName);
+                    }
+                }
+            }
+            if (chunkData.contains("geometry")) {
+                for (const auto& geom : chunkData["geometry"]) {
+                    m_activePLMs.insert(geom.get<std::string>());
                 }
             }
         }
     }
 }
 
-void DependencyManager::LoadJSON(const std::string& filepath, std::map<std::string, std::map<std::string, std::vector<std::string>>>& targetMap) {
-    targetMap.clear();
-    std::ifstream file(filepath);
-    if (!file.is_open()) return;
+void DependencyManager::AddDependency(const std::string& prefix, const std::string& chunkName, const std::string& dependencyType, const std::string& dependencyFile) {
+    if (m_dependenciesData.find(chunkName) == m_dependenciesData.end()) {
+        m_dependenciesData[chunkName] = nlohmann::json::object();
+    }
     
-    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    if (!m_dependenciesData[chunkName].contains(dependencyType)) {
+        m_dependenciesData[chunkName][dependencyType] = nlohmann::json::array();
+    }
     
-    std::string currentPrefix = "";
-    std::string currentAsset = "";
-    int depth = 0;
+    bool exists = false;
+    for (const auto& item : m_dependenciesData[chunkName][dependencyType]) {
+        if (item.get<std::string>() == dependencyFile) {
+            exists = true;
+            break;
+        }
+    }
     
-    size_t pos = 0;
-    while (pos < content.length()) {
-        char c = content[pos];
-        if (c == '{') { depth++; pos++; }
-        else if (c == '}') { depth--; pos++; }
-        else if (c == '[') { depth++; pos++; }
-        else if (c == ']') { depth--; pos++; }
-        else if (c == '\"') {
-            size_t endPos = content.find("\"", pos + 1);
-            if (endPos == std::string::npos) break;
-            std::string str = content.substr(pos + 1, endPos - pos - 1);
-            
-            size_t nextChar = content.find_first_not_of(" \t\n\r", endPos + 1);
-            if (nextChar != std::string::npos && content[nextChar] == ':') {
-                if (depth == 1) {
-                    currentPrefix = str;
-                } else if (depth == 2) {
-                    currentAsset = str;
-                }
-                pos = nextChar + 1;
-            } else {
-                if (depth == 3) {
-                    targetMap[currentPrefix][currentAsset].push_back(str);
-                }
-                pos = endPos + 1;
+    if (!exists) {
+        m_dependenciesData[chunkName][dependencyType].push_back(dependencyFile);
+        Save();
+    }
+}
+
+void DependencyManager::RemoveDependency(const std::string& prefix, const std::string& chunkName, const std::string& dependencyType, const std::string& dependencyFile) {
+    if (m_dependenciesData.find(chunkName) != m_dependenciesData.end()) {
+        if (m_dependenciesData[chunkName].contains(dependencyType)) {
+            auto& arr = m_dependenciesData[chunkName][dependencyType];
+            auto newEnd = std::remove_if(arr.begin(), arr.end(), [&](const nlohmann::json& item) {
+                return item.get<std::string>() == dependencyFile;
+            });
+            if (newEnd != arr.end()) {
+                arr.erase(newEnd, arr.end());
+                Save();
             }
-        } else {
-            pos++;
         }
     }
 }
 
-void DependencyManager::SaveJSON(const std::string& filepath, const std::map<std::string, std::map<std::string, std::vector<std::string>>>& sourceMap) {
-    std::ofstream file(filepath);
-    if (!file.is_open()) return;
-    
-    file << "{\n";
-    bool firstPrefix = true;
-    for (const auto& prefixPair : sourceMap) {
-        if (!firstPrefix) file << ",\n";
-        file << "  \"" << prefixPair.first << "\": {\n";
-        
-        bool firstAsset = true;
-        for (const auto& assetPair : prefixPair.second) {
-            if (!firstAsset) file << ",\n";
-            file << "    \"" << assetPair.first << "\": [\n";
-            
-            bool firstDep = true;
-            for (const auto& dep : assetPair.second) {
-                if (!firstDep) file << ",\n";
-                file << "      \"" << dep << "\"";
-                firstDep = false;
+std::set<std::string> DependencyManager::GetSharedFiles(const std::vector<std::string>& excludeChunks) const {
+    std::set<std::string> shared;
+    for (const auto& [chunkName, data] : m_dependenciesData) {
+        bool skip = false;
+        for (const auto& excl : excludeChunks) {
+            if (excl == chunkName || excl + ".IPD" == chunkName || excl + ".ipd" == chunkName) {
+                skip = true;
+                break;
             }
-            
-            file << "\n    ]";
-            firstAsset = false;
         }
-        
-        file << "\n  }";
-        firstPrefix = false;
+        if (skip) continue;
+
+        if (data.contains("textures")) {
+            for (const auto& tex : data["textures"]) {
+                shared.insert(tex.get<std::string>());
+            }
+        }
+        if (data.contains("geometry")) {
+            for (const auto& geom : data["geometry"]) {
+                shared.insert(geom.get<std::string>());
+            }
+        }
     }
-    file << "\n}\n";
+    return shared;
 }

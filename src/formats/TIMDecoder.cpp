@@ -18,10 +18,19 @@ bool TIMDecoder::Decode(const std::string& filepath, DecodedTIM& outTim) {
     outTim = DecodedTIM(); // Reset
 
     FILE* file = fopen(filepath.c_str(), "rb");
-    if (!file) return false;
+    if (!file) {
+        printf("[TIMDecoder] fopen failed for %s (errno=%d)\n", filepath.c_str(), errno);
+        return false;
+    }
 
     TIM_FILE_HEADER hdr;
-    if (fread(&hdr, sizeof(TIM_FILE_HEADER), 1, file) != 1 || hdr.id != 0x10) {
+    if (fread(&hdr, sizeof(TIM_FILE_HEADER), 1, file) != 1) {
+        printf("[TIMDecoder] fread hdr failed for %s\n", filepath.c_str());
+        fclose(file);
+        return false;
+    }
+    if (hdr.id != 0x10) {
+        printf("[TIMDecoder] invalid magic 0x%X for %s\n", hdr.id, filepath.c_str());
         fclose(file);
         return false;
     }
@@ -32,6 +41,7 @@ bool TIMDecoder::Decode(const std::string& filepath, DecodedTIM& outTim) {
     if (has_clut) {
         TIM_CLUT_HEADER clut_hdr;
         if (fread(&clut_hdr, sizeof(TIM_CLUT_HEADER), 1, file) != 1) {
+            printf("[TIMDecoder] fread clut_hdr failed for %s\n", filepath.c_str());
             fclose(file);
             return false;
         }
@@ -52,6 +62,7 @@ bool TIMDecoder::Decode(const std::string& filepath, DecodedTIM& outTim) {
 
     TIM_IMG_HEADER img_hdr;
     if (fread(&img_hdr, sizeof(TIM_IMG_HEADER), 1, file) != 1) {
+        printf("[TIMDecoder] fread img_hdr failed for %s\n", filepath.c_str());
         fclose(file);
         return false;
     }
@@ -88,6 +99,7 @@ bool TIMDecoder::Decode(const std::string& filepath, DecodedTIM& outTim) {
             outTim.directPixels[i] = WordToColor(words[i]);
         }
     } else {
+        printf("[TIMDecoder] unsupported bpp %d for %s\n", outTim.bpp, filepath.c_str());
         return false;
     }
 

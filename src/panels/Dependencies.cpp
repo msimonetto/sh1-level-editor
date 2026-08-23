@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "extras/IconsFontAwesome6.h"
 
-DependenciesPanel::DependenciesPanel(ChunkManager& chunkManager)
+DependenciesPanel::DependenciesPanel(FileManager& chunkManager)
     : m_chunkManager(chunkManager) {
 }
 

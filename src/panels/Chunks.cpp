@@ -1,5 +1,5 @@
 #include "panels/Chunks.h"
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "core/Config.h"
 #include "core/History.h"
 #include "core/Patcher.h"
@@ -16,17 +16,19 @@ namespace fs = std::filesystem;
 // ---------------------------------------------------------------------------
 // ChunksPanel::DrawGrid
 // Renders the spatial chunk grid and selection controls.
-// Mirrors the former ChunkManager::DrawGrid().
+// Mirrors the former FileManager::DrawGrid().
 // ---------------------------------------------------------------------------
 
-void ChunksPanel::DrawGrid(ChunkManager& mgr, Dictionary& dict) {
+void ChunksPanel::DrawGrid(FileManager& mgr, Dictionary& dict) {
   if (mgr.m_parsedChunks.empty()) {
     return;
   }
 
-  const auto &chunks = mgr.m_parsedChunks[mgr.m_selectedPrefix];
-  if (chunks.empty())
+  auto it = mgr.m_parsedChunks.find(mgr.m_selectedPrefix);
+  if (it == mgr.m_parsedChunks.end() || it->second.empty())
     return;
+
+  const auto &chunks = it->second;
 
   // Use true global bounding box for Silent Hill 1 (16x18 grid)
   int minX = -8, maxX = 7;
@@ -379,7 +381,7 @@ void ChunksPanel::DrawGrid(ChunkManager& mgr, Dictionary& dict) {
 // ChunksPanel::Draw — main entry point, called each frame from main.cpp
 // ---------------------------------------------------------------------------
 
-void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& depMgr, History* editHistory) {
+void ChunksPanel::Draw(FileManager& mgr, Dictionary& dict, DependencyManager& depMgr, History* editHistory) {
   ImGui::Begin(ICON_FA_CUBES " Chunks");
 
   if (ImGui::CollapsingHeader("Prefix", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -390,7 +392,9 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
       if (ImGui::BeginCombo("##PrefixCombo", mgr.m_selectedPrefix.c_str())) {
         for (const auto &pair : mgr.m_parsedChunks) {
           bool isSelected = (mgr.m_selectedPrefix == pair.first);
-          if (ImGui::Selectable(pair.first.c_str(), isSelected)) {
+          std::string label = pair.first;
+          if (label.empty()) label = "##empty_prefix";
+          if (ImGui::Selectable(label.c_str(), isSelected)) {
             mgr.m_selectedPrefix = pair.first;
             Config::Get().SelectedPrefix = pair.first;
             Config::Get().Save();
@@ -489,7 +493,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
       std::string work = mgr.GetWorkspaceDir();
       std::string proj = Config::Get().ProjectDirectory;
       std::thread([&mgr, chunks, comp, work, proj]() {
-        mgr.m_pipeline.ExtractToWorkspace(chunks, comp, work, proj);
+        mgr.ExtractToWorkspace(chunks, comp, work, proj);
       }).detach();
     }
 
@@ -503,7 +507,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
       std::string over = mgr.GetOverrideDir();
       std::string proj = Config::Get().ProjectDirectory;
       std::thread([&mgr, chunks, work, over, proj]() {
-        mgr.m_pipeline.DeleteSelected("workspace", chunks, false, work, over, proj);
+        mgr.DeleteSelected("workspace", chunks, false, work, over, proj);
       }).detach();
     }
     ImGui::SameLine();
@@ -520,7 +524,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
       std::string over = mgr.GetOverrideDir();
       std::string proj = Config::Get().ProjectDirectory;
       std::thread([&mgr, chunks, work, over, proj]() {
-        mgr.m_pipeline.DeployToTarget(chunks, work, over, proj);
+        mgr.DeployToTarget(chunks, work, over, proj);
       }).detach();
     }
 
@@ -530,7 +534,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
       std::string over = mgr.GetOverrideDir();
       std::string proj = Config::Get().ProjectDirectory;
       std::thread([&mgr, chunks, work, over, proj]() {
-        mgr.m_pipeline.DeleteSelected("deployment", chunks, false, work, over, proj);
+        mgr.DeleteSelected("deployment", chunks, false, work, over, proj);
       }).detach();
     }
     ImGui::SameLine();
@@ -550,7 +554,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
         std::string assets = mgr.GetAssetsDir();
         std::thread([&mgr, chunks, work, assets]() {
           bool deps = restoreDeps;
-          mgr.m_pipeline.RevertSelected(chunks, deps, work, assets);
+          mgr.RevertSelected(chunks, deps, work, assets);
           std::lock_guard<std::mutex> lock(mgr.m_reloadMutex);
           for (const auto &c : chunks) {
             if (std::find(mgr.m_reloadChunks.begin(), mgr.m_reloadChunks.end(), c) == mgr.m_reloadChunks.end()) {
@@ -575,7 +579,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
         std::string over = mgr.GetOverrideDir();
         std::string proj = Config::Get().ProjectDirectory;
         std::thread([&mgr, work, over, proj]() {
-          mgr.m_pipeline.ClearEntire("workspace", work, over, proj);
+          mgr.ClearEntire("workspace", work, over, proj);
         }).detach();
         ImGui::CloseCurrentPopup();
       }
@@ -595,7 +599,7 @@ void ChunksPanel::Draw(ChunkManager& mgr, Dictionary& dict, DependencyManager& d
         std::string over = mgr.GetOverrideDir();
         std::string proj = Config::Get().ProjectDirectory;
         std::thread([&mgr, work, over, proj]() {
-          mgr.m_pipeline.ClearEntire("deployment", work, over, proj);
+          mgr.ClearEntire("deployment", work, over, proj);
         }).detach();
         ImGui::CloseCurrentPopup();
       }

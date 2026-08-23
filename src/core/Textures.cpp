@@ -48,15 +48,14 @@ bool Textures::Load(const std::string& filepath) {
         for (int i = 0; i < m_decoded.width * m_decoded.height; ++i) {
             pixels[i] = ToRaylibColor(m_decoded.directPixels[i]);
         }
-        m_texture = LoadTextureFromImage(m_image);
         return true;
     }
 
     // Apply default palette 0 for 4-bit/8-bit
     m_image = GenImageColor(m_decoded.width, m_decoded.height, BLANK);
-    if (!m_decoded.palettes.empty()) {
-        ApplyPalette(0);
-    }
+    
+    // We defer actual texture generation (ApplyPalette / LoadTextureFromImage)
+    // to the main thread via BuildPaletteTexture, since Load() can run on background threads.
     
     return true;
 }
@@ -89,7 +88,11 @@ Texture2D Textures::BuildPaletteTexture(int paletteIndex) const {
     Texture2D empty = {0};
     if (m_decoded.rawIndices.empty() || paletteIndex < 0 ||
         paletteIndex >= (int)m_decoded.palettes.size()) {
-        if (m_decoded.bpp == 2 && m_texture.id != 0) {
+        if (m_decoded.bpp == 2) {
+            if (m_texture.id == 0 && m_image.data != nullptr) {
+                // Lazy-load OpenGL texture on main thread
+                const_cast<Textures*>(this)->m_texture = LoadTextureFromImage(m_image);
+            }
             return m_texture;
         }
         return empty;

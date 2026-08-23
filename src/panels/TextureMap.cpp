@@ -2,7 +2,7 @@
 #include "viewport/Viewport.h"
 #include "core/Config.h"
 #include "core/FileDialog.h"
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "core/DependencyManager.h"
 #include "formats/IPDParse.h"
 #include "formats/IPDWrite.h"
@@ -117,25 +117,25 @@ void TextureMapPanel::PushRecentTile(const SelectedTile &tile) {
 }
 
 void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
-                                ChunkManager &pipelineManager,
+                                FileManager &fileManager,
                                 DependencyManager &dependencyManager,
                                 Viewport &sceneViewport,
                                 LocalGeometryOverlay &localGeometryOverlay,
                                 History &history) {
   static bool loadedRecentTiles = false;
   if (!loadedRecentTiles) {
-    LoadRecentTiles(pipelineManager.GetWorkspaceDir());
+    LoadRecentTiles(fileManager.GetWorkspaceDir());
     
     auto it = m_recentTiles.begin();
     while (it != m_recentTiles.end()) {
-        std::string path = pipelineManager.GetWorkspaceDir() + "/textures/" + it->texName + ".TIM";
+        std::string path = fileManager.GetWorkspaceDir() + "/textures/" + it->texName + ".TIM";
         if (!std::filesystem::exists(path)) {
             it = m_recentTiles.erase(it);
         } else {
             ++it;
         }
     }
-    SaveRecentTiles(pipelineManager.GetWorkspaceDir());
+    SaveRecentTiles(fileManager.GetWorkspaceDir());
 
     if (!m_recentTiles.empty()) {
       m_currentTile = m_recentTiles.front();
@@ -197,7 +197,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
 
     // if we selected a face, update texture manager
     if (activeFace && !activeFace->texName.empty()) {
-      std::string path = pipelineManager.GetWorkspaceDir() + "/textures/" +
+      std::string path = fileManager.GetWorkspaceDir() + "/textures/" +
                          activeFace->texName + ".TIM";
       if (path != Config::Get().LastTexturePath) {
         if (path != lastFailedPath) {
@@ -221,9 +221,9 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
   float labelWidth = 110.0f;
   float browseWidth = 80.0f;
 
-  std::vector<std::string> selectedChunks = pipelineManager.GetSelectedChunks();
+  std::vector<std::string> selectedChunks = fileManager.GetSelectedChunks();
   if (selectedChunks.empty()) {
-    selectedChunks = pipelineManager.GetViewportChunks();
+    selectedChunks = fileManager.GetViewportChunks();
   }
   if (selectedChunks.empty()) {
     if (!localGeometryOverlay.m_selectedChunk.empty()) {
@@ -243,8 +243,8 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
   ImGui::SameLine(labelWidth);
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
 
-  std::string currentWorkspaceDir = pipelineManager.GetWorkspaceDir();
-  std::string currentPrefix = pipelineManager.GetSelectedPrefix();
+  std::string currentWorkspaceDir = fileManager.GetWorkspaceDir();
+  std::string currentPrefix = fileManager.GetSelectedPrefix();
   if (currentWorkspaceDir != lastWorkspaceDirForTex || currentPrefix != lastSelectedPrefixForTex || ImGui::GetTime() - lastTexRefreshTime > 1.0) {
     lastWorkspaceDirForTex = currentWorkspaceDir;
     lastSelectedPrefixForTex = currentPrefix;
@@ -338,9 +338,9 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
       chunksToRebuild.insert(std::get<0>(mKey));
     for (const auto &cName : chunksToRebuild) {
       sceneViewport.RebuildChunkBatches(cName,
-                                        pipelineManager.GetWorkspaceDir());
+                                        fileManager.GetWorkspaceDir());
       localGeometryOverlay.RebuildChunkBatches(
-          cName, pipelineManager.GetWorkspaceDir());
+          cName, fileManager.GetWorkspaceDir());
     }
   };
 
@@ -359,7 +359,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
       for (const auto &tex : cachedTextures) {
         if (ImGui::Selectable(tex.c_str())) {
           std::string path =
-              pipelineManager.GetWorkspaceDir() + "/textures/" + tex + ".TIM";
+              fileManager.GetWorkspaceDir() + "/textures/" + tex + ".TIM";
           if (testTexture.Load(path)) {
             Config::Get().LastTexturePath = path;
             Config::Get().Save();
@@ -400,10 +400,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                             snapAfter, "Change texture to " + tex});
               sceneViewport.RebuildChunkBatches(
                   localGeometryOverlay.m_selectedChunk,
-                  pipelineManager.GetWorkspaceDir());
+                  fileManager.GetWorkspaceDir());
               localGeometryOverlay.RebuildChunkBatches(
                   localGeometryOverlay.m_selectedChunk,
-                  pipelineManager.GetWorkspaceDir());
+                  fileManager.GetWorkspaceDir());
             }
           }
         }
@@ -462,10 +462,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                       localGeometryOverlay.m_selectedMeshIdx, snapBefore,
                       snapAfter, "Change texture to " + tex});
         sceneViewport.RebuildChunkBatches(localGeometryOverlay.m_selectedChunk,
-                                          pipelineManager.GetWorkspaceDir());
+                                          fileManager.GetWorkspaceDir());
         localGeometryOverlay.RebuildChunkBatches(
             localGeometryOverlay.m_selectedChunk,
-            pipelineManager.GetWorkspaceDir());
+            fileManager.GetWorkspaceDir());
       }
     }
   }
@@ -514,10 +514,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                         snapAfter, "Change texture to " + tex});
           sceneViewport.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
-              pipelineManager.GetWorkspaceDir());
+              fileManager.GetWorkspaceDir());
           localGeometryOverlay.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
-              pipelineManager.GetWorkspaceDir());
+              fileManager.GetWorkspaceDir());
         }
       }
     }
@@ -543,10 +543,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                "Change palette to row " + std::to_string(currentPalette)});
           sceneViewport.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
-              pipelineManager.GetWorkspaceDir());
+              fileManager.GetWorkspaceDir());
           localGeometryOverlay.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
-              pipelineManager.GetWorkspaceDir());
+              fileManager.GetWorkspaceDir());
         }
       }
     }
@@ -565,7 +565,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         m_currentTile.palette = currentPalette;
 
         PushRecentTile(m_currentTile);
-        SaveRecentTiles(pipelineManager.GetWorkspaceDir());
+        SaveRecentTiles(fileManager.GetWorkspaceDir());
 
         RenderMesh snapAfter = *activeMesh;
         history.Push({localGeometryOverlay.m_selectedChunk,
@@ -574,10 +574,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                       snapAfter, "Edit UVs"});
         sceneViewport.RebuildChunkBatches(
             localGeometryOverlay.m_selectedChunk,
-            pipelineManager.GetWorkspaceDir());
+            fileManager.GetWorkspaceDir());
         localGeometryOverlay.RebuildChunkBatches(
             localGeometryOverlay.m_selectedChunk,
-            pipelineManager.GetWorkspaceDir());
+            fileManager.GetWorkspaceDir());
     }
 
     if (activeFace) {
@@ -605,10 +605,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                       localGeometryOverlay.m_selectedMeshIdx, snapBefore,
                       *activeMesh, "Rotate UV CCW"});
         sceneViewport.RebuildChunkBatches(localGeometryOverlay.m_selectedChunk,
-                                          pipelineManager.GetWorkspaceDir());
+                                          fileManager.GetWorkspaceDir());
         localGeometryOverlay.RebuildChunkBatches(
             localGeometryOverlay.m_selectedChunk,
-            pipelineManager.GetWorkspaceDir());
+            fileManager.GetWorkspaceDir());
       }
       ImGui::SameLine();
       if (ImGui::Button("Rotate CW (90)")) {
@@ -631,17 +631,17 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                       localGeometryOverlay.m_selectedMeshIdx, snapBefore,
                       *activeMesh, "Rotate UV CW"});
         sceneViewport.RebuildChunkBatches(localGeometryOverlay.m_selectedChunk,
-                                          pipelineManager.GetWorkspaceDir());
+                                          fileManager.GetWorkspaceDir());
         localGeometryOverlay.RebuildChunkBatches(
             localGeometryOverlay.m_selectedChunk,
-            pipelineManager.GetWorkspaceDir());
+            fileManager.GetWorkspaceDir());
       }
 
       ImGui::Separator();
       if (ImGui::Button("Reset Face to Original State")) {
         if (hasBackup) {
           *activeMesh = originalMeshBackup;
-          std::string path = pipelineManager.GetWorkspaceDir() + "/textures/" +
+          std::string path = fileManager.GetWorkspaceDir() + "/textures/" +
                              activeFace->texName + ".TIM";
           if (path != Config::Get().LastTexturePath) {
             if (testTexture.Load(path)) {
@@ -653,10 +653,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
           testTexture.ApplyPalette(currentPalette);
           sceneViewport.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
-              pipelineManager.GetWorkspaceDir());
+              fileManager.GetWorkspaceDir());
           localGeometryOverlay.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
-              pipelineManager.GetWorkspaceDir());
+              fileManager.GetWorkspaceDir());
         }
       }
 
@@ -665,7 +665,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
       {
         auto syncUiToActiveFace = [&]() {
           if (activeFace && !activeFace->texName.empty()) {
-            std::string expectedPath = pipelineManager.GetWorkspaceDir() +
+            std::string expectedPath = fileManager.GetWorkspaceDir() +
                                        "/textures/" + activeFace->texName +
                                        ".TIM";
             if (Config::Get().LastTexturePath != expectedPath ||
@@ -689,7 +689,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
           ImGui::BeginDisabled();
         if (ImGui::Button("Undo (Z)")) {
           if (history.Undo(sceneViewport, localGeometryOverlay,
-                           pipelineManager.GetWorkspaceDir())) {
+                           fileManager.GetWorkspaceDir())) {
             syncUiToActiveFace();
           }
         }
@@ -704,7 +704,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
           ImGui::BeginDisabled();
         if (ImGui::Button("Redo (Y)")) {
           if (history.Redo(sceneViewport, localGeometryOverlay,
-                           pipelineManager.GetWorkspaceDir())) {
+                           fileManager.GetWorkspaceDir())) {
             syncUiToActiveFace();
           }
         }
@@ -716,7 +716,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
 
         ImGui::SameLine();
         if (ImGui::Button("Save Chunk (S)") && activeObjName) {
-          std::string workDir = pipelineManager.GetWorkspaceDir();
+          std::string workDir = fileManager.GetWorkspaceDir();
           std::string chunk = localGeometryOverlay.m_selectedChunk;
           std::string ipdPath = workDir + "/chunks/" + chunk + ".IPD";
           std::string prefix = DeriveChunkPrefix(chunk);
@@ -734,11 +734,11 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                 IPDWrite::WriteChunk(ipdPath, glbPath, *cd, &n, &written);
             if (ok) {
               if (written) {
-                pipelineManager.Log("[SAVE] Wrote " + chunk + ".IPD (" +
+                fileManager.Log("[SAVE] Wrote " + chunk + ".IPD (" +
                                     std::to_string(n) + " face(s) patched)");
               }
             } else {
-              pipelineManager.Log("[SAVE] FAILED to write " + chunk + ".IPD",
+              fileManager.Log("[SAVE] FAILED to write " + chunk + ".IPD",
                                   true);
             }
           }
@@ -758,10 +758,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
           if (cd) {
             auto warnings = IPDWrite::Validate(*cd);
             if (warnings.empty()) {
-              pipelineManager.Log("[VALIDATE] No issues found", false);
+              fileManager.Log("[VALIDATE] No issues found", false);
             } else {
               for (const auto &w : warnings)
-                pipelineManager.Log("[VALIDATE] " + w, true);
+                fileManager.Log("[VALIDATE] " + w, true);
             }
           }
         }
@@ -793,7 +793,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
   if (ImGui::Button("Save Active Tile to Cache") &&
       !m_currentTile.texName.empty()) {
     PushRecentTile(m_currentTile);
-    SaveRecentTiles(pipelineManager.GetWorkspaceDir());
+    SaveRecentTiles(fileManager.GetWorkspaceDir());
   }
 
   ImGui::Text("Recent Tiles Cache:");
@@ -803,7 +803,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         std::remove_if(m_recentTiles.begin(), m_recentTiles.end(),
                        [](const SelectedTile &t) { return !t.isPinned; }),
         m_recentTiles.end());
-    SaveRecentTiles(pipelineManager.GetWorkspaceDir());
+    SaveRecentTiles(fileManager.GetWorkspaceDir());
   }
 
   ImGui::BeginChild("RecentTilesScroll", ImVec2(0, 90), true,
@@ -816,7 +816,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     int h = (int)((t.maxV - t.minV) * 256.0f);
 
     Texture2D cachedTex = TextureCache::Get().Fetch(
-        t.texName, t.palette, pipelineManager.GetWorkspaceDir());
+        t.texName, t.palette, fileManager.GetWorkspaceDir());
 
     ImVec2 uv0(t.minU, t.minV);
     ImVec2 uv1(t.maxU, t.maxV);
@@ -830,7 +830,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                              ImVec2(64, 64), uv0, uv1, bgCol)) {
         m_currentTile = t;
         // Also update the main Texture Manager view
-        std::string expectedPath = pipelineManager.GetWorkspaceDir() +
+        std::string expectedPath = fileManager.GetWorkspaceDir() +
                                    "/textures/" + t.texName + ".TIM";
         if (Config::Get().LastTexturePath != expectedPath) {
           if (testTexture.Load(expectedPath)) {
@@ -858,7 +858,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     if (ImGui::IsItemHovered() &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
       t.isPinned = !t.isPinned;
-      SaveRecentTiles(pipelineManager.GetWorkspaceDir());
+      SaveRecentTiles(fileManager.GetWorkspaceDir());
     }
 
     if (ImGui::IsItemHovered()) {

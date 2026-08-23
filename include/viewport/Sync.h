@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-class ChunkManager;
+class FileManager;
 class SceneOverlay;
 class LocalGeometryOverlay;
 struct ParsedChunk;
@@ -22,7 +22,7 @@ public:
   void Initialize(class Viewport &sceneViewport,
                   class LocalGeometryOverlay &localGeometryOverlay);
 
-  void Update(class ChunkManager &pipelineManager, class Viewport &sceneViewport,
+  void Update(class FileManager &fileManager, class Viewport &sceneViewport,
               class LocalGeometryOverlay &localGeometryOverlay);
 
   // Returns true if chunks are loading, and populates current/total progress

@@ -1,5 +1,5 @@
 #pragma once
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "core/History.h"
 #include "core/Textures.h"
 #include "formats/Structs.h"
@@ -19,7 +19,7 @@ class Viewport;
 class TextureMapPanel {
 public:
   void Draw(Textures &testTexture, int &currentPalette,
-            ChunkManager &pipelineManager, DependencyManager &dependencyManager, Viewport &sceneViewport,
+            FileManager &fileManager, DependencyManager &dependencyManager, Viewport &sceneViewport,
             LocalGeometryOverlay &localGeometryOverlay, History &history);
 
   struct SelectedTile {

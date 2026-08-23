@@ -1,4 +1,4 @@
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "formats/IPDParse.h"
 #include "formats/OverlayLoader.h"
 #include "core/Textures.h"
@@ -17,11 +17,11 @@ void ViewportSync::Initialize(Viewport &sceneViewport,
   localGeometryOverlay.SetSharedChunks(&sceneViewport.GetChunks());
 }
 
-void ViewportSync::Update(ChunkManager &pipelineManager, Viewport &sceneViewport,
+void ViewportSync::Update(FileManager &fileManager, Viewport &sceneViewport,
                           LocalGeometryOverlay &localGeometryOverlay) {
-  // Auto-sync viewports with ChunkManager's RMB selection
-  auto curViewport = pipelineManager.GetViewportChunks();
-  std::string workspaceDir = pipelineManager.GetWorkspaceDir();
+  // Auto-sync viewports with FileManager's RMB selection
+  auto curViewport = fileManager.GetViewportChunks();
+  std::string workspaceDir = fileManager.GetWorkspaceDir();
 
   // Additions (Spawn async task)
   int newLoads = 0;

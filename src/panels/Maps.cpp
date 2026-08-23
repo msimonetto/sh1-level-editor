@@ -1,5 +1,5 @@
 #include "panels/Maps.h"
-#include "core/AssetManager.h"
+#include "core/FileManager.h"
 #include "core/MapTable.h"
 #include "formats/OverlayLoader.h"
 #include "imgui.h"
@@ -181,7 +181,7 @@ void MapsPanel::Draw(WaypointsOverlay *eventViewport) {
             OverlayLoader::Save(m_selectedMapKey, tmpOverlay);
           }
         }
-        AssetManager pipeline;
+        FileManager pipeline;
         pipeline.DeployOverlayToDecomp(m_selectedMapKey);
       }
       ImGui::Spacing();

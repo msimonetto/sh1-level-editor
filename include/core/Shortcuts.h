@@ -1,18 +1,18 @@
 #pragma once
 
 class History;
-class ChunkManager;
+class FileManager;
 class Viewport;
 class LocalGeometryOverlay;
 class WaypointsOverlay;
 
 class Shortcuts {
 public:
-  void Handle(History &history, ChunkManager &pipelineManager,
+  void Handle(History &history, FileManager &fileManager,
               Viewport &sceneViewport,
               LocalGeometryOverlay &localGeometryOverlay,
               WaypointsOverlay *eventViewport = nullptr);
-  void SaveSelected(ChunkManager &pipelineManager,
+  void SaveSelected(FileManager &fileManager,
                     Viewport &sceneViewport);
-  void SaveAll(ChunkManager &pipelineManager, Viewport &sceneViewport);
+  void SaveAll(FileManager &fileManager, Viewport &sceneViewport);
 };

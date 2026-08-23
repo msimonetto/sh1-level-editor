@@ -5,15 +5,15 @@
 #include <string>
 
 namespace MenuPanel {
-    bool Draw(Shortcuts& shortcuts, ChunkManager& pipelineManager, Viewport& viewport, History& history, LocalGeometryOverlay& localGeometryOverlay, WaypointsOverlay& eventOverlay, SettingsPanel& settingsWindow) {
+    bool Draw(Shortcuts& shortcuts, FileManager& fileManager, Viewport& viewport, History& history, LocalGeometryOverlay& localGeometryOverlay, WaypointsOverlay& eventOverlay, SettingsPanel& settingsWindow) {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu(ICON_FA_FILE " File")) {
                 if (ImGui::MenuItem(ICON_FA_CUBES " Save Chunks", "Ctrl+S")) {
-                    shortcuts.SaveSelected(pipelineManager, viewport);
+                    shortcuts.SaveSelected(fileManager, viewport);
                 }
                 if (ImGui::MenuItem(ICON_FA_MAP " Save Maps")) {}
                 if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK " Save All", "Ctrl+Shift+S")) {
-                    shortcuts.SaveAll(pipelineManager, viewport);
+                    shortcuts.SaveAll(fileManager, viewport);
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem(ICON_FA_FOLDER " Change Workspace")) {}
@@ -29,11 +29,11 @@ namespace MenuPanel {
             if (ImGui::BeginMenu(ICON_FA_PEN_TO_SQUARE " Edit")) {
                 std::string undoLabel = history.CanUndo() ? (ICON_FA_ARROW_ROTATE_LEFT " Undo " + history.PeekUndoDesc()) : (ICON_FA_ARROW_ROTATE_LEFT " Undo");
                 if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, history.CanUndo())) {
-                    history.Undo(viewport, localGeometryOverlay, &eventOverlay, pipelineManager.GetWorkspaceDir());
+                    history.Undo(viewport, localGeometryOverlay, &eventOverlay, fileManager.GetWorkspaceDir());
                 }
                 std::string redoLabel = history.CanRedo() ? (ICON_FA_ARROW_ROTATE_RIGHT " Redo " + history.PeekRedoDesc()) : (ICON_FA_ARROW_ROTATE_RIGHT " Redo");
                 if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, history.CanRedo())) {
-                    history.Redo(viewport, localGeometryOverlay, &eventOverlay, pipelineManager.GetWorkspaceDir());
+                    history.Redo(viewport, localGeometryOverlay, &eventOverlay, fileManager.GetWorkspaceDir());
                 }
                 if (ImGui::MenuItem(ICON_FA_CLOCK " Action History")) {}
                 ImGui::Separator();

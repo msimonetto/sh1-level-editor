@@ -1,5 +1,5 @@
 #include "core/Shortcuts.h"
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "core/History.h"
 #include "formats/IPDParse.h"
 #include "formats/IPDWrite.h"
@@ -7,31 +7,31 @@
 #include "viewport/Viewport.h"
 
 void Shortcuts::Handle(History &history,
-                             ChunkManager &pipelineManager,
+                             FileManager &fileManager,
                              Viewport &sceneViewport,
                              LocalGeometryOverlay &localGeometryOverlay,
                              WaypointsOverlay *eventViewport) {
   if (IsKeyDown(KEY_LEFT_CONTROL)) {
     if (IsKeyPressed(KEY_Z))
       history.Undo(sceneViewport, localGeometryOverlay, eventViewport,
-                   pipelineManager.GetWorkspaceDir());
+                   fileManager.GetWorkspaceDir());
     if (IsKeyPressed(KEY_Y))
       history.Redo(sceneViewport, localGeometryOverlay, eventViewport,
-                   pipelineManager.GetWorkspaceDir());
+                   fileManager.GetWorkspaceDir());
 
     if (IsKeyPressed(KEY_S)) {
       if (IsKeyDown(KEY_LEFT_SHIFT)) {
-        SaveAll(pipelineManager, sceneViewport);
+        SaveAll(fileManager, sceneViewport);
       } else {
-        SaveSelected(pipelineManager, sceneViewport);
+        SaveSelected(fileManager, sceneViewport);
       }
     }
   }
 }
 
-void Shortcuts::SaveSelected(ChunkManager &pipelineManager,
+void Shortcuts::SaveSelected(FileManager &fileManager,
                                    Viewport &sceneViewport) {
-  auto selectedChunks = pipelineManager.GetSelectedChunks();
+  auto selectedChunks = fileManager.GetSelectedChunks();
   if (selectedChunks.empty()) {
     for (const auto &lc : sceneViewport.GetChunks()) {
       if (lc.data && !lc.data->chunkName.empty()) {
@@ -41,7 +41,7 @@ void Shortcuts::SaveSelected(ChunkManager &pipelineManager,
   }
   if (!selectedChunks.empty()) {
     for (const auto &chunkName : selectedChunks) {
-      std::string workspaceDir = pipelineManager.GetWorkspaceDir();
+      std::string workspaceDir = fileManager.GetWorkspaceDir();
       std::string ipdPath = workspaceDir + "/chunks/" + chunkName + ".IPD";
       std::string glbPath = workspaceDir + "/geometry/" +
                             DeriveChunkPrefix(chunkName) + "_GLB.PLM";
@@ -61,31 +61,31 @@ void Shortcuts::SaveSelected(ChunkManager &pipelineManager,
             IPDWrite::WriteChunk(ipdPath, glbPath, *chunkData, &n, &written);
         if (ok) {
           if (written) {
-            pipelineManager.Log("[SAVE] Wrote " + chunkName + ".IPD (" +
+            fileManager.Log("[SAVE] Wrote " + chunkName + ".IPD (" +
                                 std::to_string(n) + " face(s) patched)");
           }
         } else {
-          pipelineManager.Log("[SAVE] FAILED to write " + chunkName + ".IPD",
+          fileManager.Log("[SAVE] FAILED to write " + chunkName + ".IPD",
                               true);
         }
       } else {
-        pipelineManager.Log("[SAVE] Error: Selected chunk data not found. It "
+        fileManager.Log("[SAVE] Error: Selected chunk data not found. It "
                             "might not be loaded in the viewport.",
                             true);
       }
     }
   } else {
-    pipelineManager.Log("[SAVE] No chunk loaded or selected to save.", true);
+    fileManager.Log("[SAVE] No chunk loaded or selected to save.", true);
   }
 }
 
-void Shortcuts::SaveAll(ChunkManager &pipelineManager,
+void Shortcuts::SaveAll(FileManager &fileManager,
                               Viewport &sceneViewport) {
   int count = 0;
   for (auto &lc : sceneViewport.GetChunks()) {
     if (lc.data) {
       std::string chunkName = lc.data->chunkName;
-      std::string workspaceDir = pipelineManager.GetWorkspaceDir();
+      std::string workspaceDir = fileManager.GetWorkspaceDir();
       std::string ipdPath = workspaceDir + "/chunks/" + chunkName + ".IPD";
       std::string glbPath = workspaceDir + "/geometry/" +
                             DeriveChunkPrefix(chunkName) + "_GLB.PLM";
@@ -98,6 +98,6 @@ void Shortcuts::SaveAll(ChunkManager &pipelineManager,
     }
   }
   if (count > 0) {
-    pipelineManager.Log("[SAVE] Wrote " + std::to_string(count) + " chunks.");
+    fileManager.Log("[SAVE] Wrote " + std::to_string(count) + " chunks.");
   }
 }

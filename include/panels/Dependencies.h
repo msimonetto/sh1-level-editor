@@ -1,16 +1,16 @@
 #pragma once
 
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include <string>
 #include <vector>
 
 class DependenciesPanel {
 public:
-    DependenciesPanel(ChunkManager& chunkManager);
+    DependenciesPanel(FileManager& chunkManager);
     ~DependenciesPanel() = default;
 
     void Render();
 
 private:
-    ChunkManager& m_chunkManager;
+    FileManager& m_chunkManager;
 };

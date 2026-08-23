@@ -38,6 +38,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(rlImGui)
 
+# 4. Fetch nlohmann/json
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/libs/nlohmann_json
+)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(nlohmann_json)
+
 
 # Core Source Files
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
@@ -75,7 +84,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib nlohmann_json::nlohmann_json)
 
 # MinGW/Windows specific linking (to avoid console window in release, if desired)
 if (WIN32)

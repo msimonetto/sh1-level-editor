@@ -7,7 +7,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "core/Config.h"
 #include "core/Dictionary.h"
 #include "core/History.h"
@@ -82,9 +82,9 @@ int main(int argc, char **argv) {
 
   int currentPalette = 0;
 
-  ChunkManager pipelineManager;
+  FileManager fileManager;
   Dictionary dictionary;
-  DependencyManager dependencyManager(pipelineManager.GetWorkspaceDir());
+  DependencyManager dependencyManager(fileManager.GetWorkspaceDir());
   History history(50); // Global undo/redo, depth configurable from UI
 
   Viewport viewport;
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
   // Maps panel (full implementation)
   MapsPanel mapsPanel;
 
-  DependenciesPanel dependenciesPanel(pipelineManager);
+  DependenciesPanel dependenciesPanel(fileManager);
 
   Shortcuts shortcuts;
   SettingsPanel settingsWindow;
@@ -119,8 +119,8 @@ int main(int argc, char **argv) {
 
   // Pass workspace directory so GlobalGeometryViewport and LocalGeometryOverlay
   // can find dependencies.json and .IPD / _GLB.PLM files.
-  globalGeometryPanel.SetWorkspaceDir(pipelineManager.GetWorkspaceDir());
-  localGeometryOverlay.m_lastWorkspaceDir = pipelineManager.GetWorkspaceDir();
+  globalGeometryPanel.SetWorkspaceDir(fileManager.GetWorkspaceDir());
+  localGeometryOverlay.m_lastWorkspaceDir = fileManager.GetWorkspaceDir();
 
   // By default, hook up the tool panel to the edit viewport as a stub
   viewportToolsPanel.SetActiveViewport(&viewport);
@@ -140,9 +140,9 @@ int main(int argc, char **argv) {
       lastUpdate = GetTime();
     }
     if (cache.find(name) == cache.end()) {
-      bool ext = std::filesystem::exists(pipelineManager.GetWorkspaceDir() +
+      bool ext = std::filesystem::exists(fileManager.GetWorkspaceDir() +
                                          "/chunks/" + name + ".IPD");
-      bool dep = std::filesystem::exists(pipelineManager.GetOverrideDir() +
+      bool dep = std::filesystem::exists(fileManager.GetOverrideDir() +
                                          "/BG/" + name + ".IPD");
       cache[name] = {ext, dep};
     }
@@ -158,10 +158,10 @@ int main(int argc, char **argv) {
   localGeometryOverlay.m_legendColorCallback = legendColorCb;
 
   // Restore state from config
-  pipelineManager.SetSelectedChunks(Config::Get().ParseStringList(Config::Get().PersistedSelection));
+  fileManager.SetSelectedChunks(Config::Get().ParseStringList(Config::Get().PersistedSelection));
   std::vector<std::string> viewportChunks = Config::Get().ParseStringList(Config::Get().PersistedViewportChunks);
-  pipelineManager.SetViewportChunks(viewportChunks);
-  pipelineManager.QueueReloadChunks(viewportChunks);
+  fileManager.SetViewportChunks(viewportChunks);
+  fileManager.QueueReloadChunks(viewportChunks);
 
   ViewportCameraState camState;
   camState.azimuth = Config::Get().PersistedCamAzimuth;
@@ -264,30 +264,30 @@ int main(int argc, char **argv) {
                        ImGuiDockNodeFlags_None);
     }
 
-    if (!MenuPanel::Draw(shortcuts, pipelineManager, viewport, history, localGeometryOverlay, eventOverlay, settingsWindow)) {
+    if (!MenuPanel::Draw(shortcuts, fileManager, viewport, history, localGeometryOverlay, eventOverlay, settingsWindow)) {
       break;
     }
 
     ImGui::End();
 
     // Draw the Chunks panel (pipeline manager UI + console)
-    ChunksPanel::Draw(pipelineManager, dictionary, dependencyManager, &history);
+    ChunksPanel::Draw(fileManager, dictionary, dependencyManager, &history);
 
     dependenciesPanel.Render();
 
-    for (const auto &chunk : pipelineManager.ConsumeReloadChunks()) {
+    for (const auto &chunk : fileManager.ConsumeReloadChunks()) {
       viewportSync.ForceReloadChunk(chunk, viewport,
                                     localGeometryOverlay);
     }
 
     for (const auto &chunk : localGeometryOverlay.ConsumeModifiedChunks()) {
       viewport.RebuildChunkBatches(chunk,
-                                        pipelineManager.GetWorkspaceDir());
+                                        fileManager.GetWorkspaceDir());
     }
 
-    viewportSync.Update(pipelineManager, viewport,
+    viewportSync.Update(fileManager, viewport,
                         localGeometryOverlay);
-    shortcuts.Handle(history, pipelineManager, viewport,
+    shortcuts.Handle(history, fileManager, viewport,
                      localGeometryOverlay, &eventOverlay);
 
     // Show Viewports
@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
     // Our Windows
     // ----------------------------------------------------------------
 
-    textureWindow.Draw(testTexture, currentPalette, pipelineManager, dependencyManager,
+    textureWindow.Draw(testTexture, currentPalette, fileManager, dependencyManager,
                        viewport, localGeometryOverlay, history);
 
     viewport.SetActiveMode(viewportToolsPanel.GetActiveMode());
@@ -350,8 +350,8 @@ int main(int argc, char **argv) {
   }
 
   // Save state to config
-  Config::Get().PersistedSelection = Config::Get().StringListToString(pipelineManager.GetSelectedChunks());
-  Config::Get().PersistedViewportChunks = Config::Get().StringListToString(pipelineManager.GetViewportChunks());
+  Config::Get().PersistedSelection = Config::Get().StringListToString(fileManager.GetSelectedChunks());
+  Config::Get().PersistedViewportChunks = Config::Get().StringListToString(fileManager.GetViewportChunks());
   
   ViewportCameraState currentCam = viewport.GetCameraState();
   Config::Get().PersistedCamAzimuth = currentCam.azimuth;

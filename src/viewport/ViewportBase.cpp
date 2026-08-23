@@ -543,7 +543,7 @@ void ViewportBase::DrawViewportCanvas(int w, int h) {
 
 void ViewportBase::DrawCustomGrid(float extent) {
   if (extent == 320.0f) {
-    // Default global viewport grid aligned with ChunkManager's 16x18 range:
+    // Default global viewport grid aligned with FileManager's 16x18 range:
     // X: [-8, 7] -> world X [-320.0f, +320.0f]
     // Z: [-8, 9] -> world Z [-400.0f, +320.0f]
     DrawCustomGrid(-320.0f, 320.0f, -400.0f, 320.0f);

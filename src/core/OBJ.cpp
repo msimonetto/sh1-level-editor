@@ -1,8 +1,8 @@
-#include "core/ChunkManager.h"
+#include "core/FileManager.h"
 #include "core/DependencyManager.h"
 #include <fstream>
 
-bool OBJ::Export(const ChunkManager& inspector, const DependencyManager& depMgr, const std::string& outPath, bool exportCollision) {
+bool OBJ::Export(const FileManager& inspector, const DependencyManager& depMgr, const std::string& outPath, bool exportCollision) {
     // Removed empty check since Inspector now aggregates files
 
     std::ofstream objFile(outPath);
