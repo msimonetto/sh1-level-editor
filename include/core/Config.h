@@ -47,7 +47,8 @@ public:
   int KeyMoveRight = KEY_RIGHT;
   int KeyMoveUp = KEY_PAGE_UP;
   int KeyMoveDown = KEY_PAGE_DOWN;
-  int KeyMultiselect = KEY_LEFT_CONTROL;
+  int KeyMultiselect = KEY_LEFT_SHIFT;
+  bool IsMultiselectDown() const;
 
   // Camera Controls
   int KeyCamMoveForward = KEY_W;

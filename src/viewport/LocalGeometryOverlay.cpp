@@ -633,7 +633,7 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
 
     ImGuiIO &io = ImGui::GetIO();
     bool isRightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-    bool isMultiselect = io.KeyShift || io.KeyCtrl || IsKeyDown(Config::Get().KeyMultiselect);
+    bool isMultiselect = Config::Get().IsMultiselectDown();
 
     if (bestVertexIdx >= 0) {
       m_selectedChunk = bestChunk;
@@ -669,7 +669,7 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
 
   ImGuiIO &io = ImGui::GetIO();
   bool isRightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-  bool isMultiselect = io.KeyCtrl || io.KeyShift || IsKeyDown(Config::Get().KeyMultiselect);
+  bool isMultiselect = Config::Get().IsMultiselectDown();
 
   if (hitFaceIdx >= 0) {
     m_selectedChunk = hitChunk;
@@ -712,8 +712,7 @@ void LocalGeometryOverlay::HandleBoxPicking(Viewport &vp, Rectangle box) {
   if (box.width < 1.0f || box.height < 1.0f)
     return;
 
-  ImGuiIO &io = ImGui::GetIO();
-  bool isMultiselect = io.KeyCtrl || io.KeyShift || IsKeyDown(Config::Get().KeyMultiselect);
+  bool isMultiselect = Config::Get().IsMultiselectDown();
 
   Vector3 camPos = vp.GetCamera().position;
   Vector3 forward = Vector3Normalize({vp.GetCamera().target.x - vp.GetCamera().position.x,
@@ -1388,13 +1387,13 @@ void LocalGeometryOverlay::DrawContextMenu() {
           ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Rotate Texture")) {
-          if (ImGui::MenuItem("90*")) {
+          if (ImGui::MenuItem("90*", ",")) {
             Geometry::RotateUV(*this, 1, m_history);
           }
           if (ImGui::MenuItem("180*")) {
             Geometry::RotateUV(*this, 2, m_history);
           }
-          if (ImGui::MenuItem("270*")) {
+          if (ImGui::MenuItem("270*", ".")) {
             Geometry::RotateUV(*this, 3, m_history);
           }
           ImGui::EndMenu();

@@ -1,4 +1,5 @@
 #include "core/Config.h"
+#include "imgui.h"
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -177,4 +178,16 @@ void Config::Save() {
         file << "PersistedCamTarget=" << Vector3ToString(PersistedCamTarget) << "\n";
         file << "PersistedToolsTab=" << PersistedToolsTab << "\n";
     }
+}
+
+bool Config::IsMultiselectDown() const {
+    bool isDown = IsKeyDown(KeyMultiselect);
+    if (KeyMultiselect == KEY_LEFT_CONTROL || KeyMultiselect == KEY_RIGHT_CONTROL) {
+        isDown = isDown || ImGui::GetIO().KeyCtrl;
+    } else if (KeyMultiselect == KEY_LEFT_SHIFT || KeyMultiselect == KEY_RIGHT_SHIFT) {
+        isDown = isDown || ImGui::GetIO().KeyShift;
+    } else if (KeyMultiselect == KEY_LEFT_ALT || KeyMultiselect == KEY_RIGHT_ALT) {
+        isDown = isDown || ImGui::GetIO().KeyAlt;
+    }
+    return isDown;
 }

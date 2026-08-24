@@ -434,10 +434,7 @@ void ViewportBase::DrawViewportCanvas(int w, int h) {
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_boxSelectStart = m_localMousePos;
-        bool isMultiselectHeld = IsKeyDown(Config::Get().KeyMultiselect) ||
-                                 ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift) ||
-                                 ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl) ||
-                                 ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl;
+        bool isMultiselectHeld = Config::Get().IsMultiselectDown();
         if (isMultiselectHeld) {
           m_isBoxSelecting = true;
         } else {

@@ -405,6 +405,7 @@ void LocalGeometryPanel::DrawFacesSection(LocalGeometryOverlay &overlay, History
     if (ImGui::Button("UV 90°", ImVec2(thirdW, 0))) {
       Geometry::RotateUV(overlay, 1, history);
     }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate UV 90° Clockwise (Hotkey: ,)");
     ImGui::SameLine();
     if (ImGui::Button("UV 180°", ImVec2(thirdW, 0))) {
       Geometry::RotateUV(overlay, 2, history);
@@ -413,6 +414,7 @@ void LocalGeometryPanel::DrawFacesSection(LocalGeometryOverlay &overlay, History
     if (ImGui::Button("UV 270°", ImVec2(thirdW, 0))) {
       Geometry::RotateUV(overlay, 3, history);
     }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate UV 270° / 90° Counter-Clockwise (Hotkey: .)");
 
     ImGui::Spacing();
     ImGui::Text("Mirror UV:");

@@ -3,6 +3,8 @@
 #include "core/History.h"
 #include "formats/IPDParse.h"
 #include "formats/IPDWrite.h"
+#include "geometry/FaceOperations.h"
+#include "imgui.h"
 #include "raylib.h"
 #include "viewport/Viewport.h"
 
@@ -25,6 +27,18 @@ void Shortcuts::Handle(History &history,
       } else {
         SaveSelected(fileManager, sceneViewport);
       }
+    }
+  }
+
+  // Comma ',' and Period '.' shortcuts to rotate selected face(s) UV map
+  if (!ImGui::GetIO().WantTextInput) {
+    // Clockwise
+    if (IsKeyPressed(KEY_COMMA) || ImGui::IsKeyPressed(ImGuiKey_Comma)) {
+      Geometry::RotateUV(localGeometryOverlay, 1, &history);
+    }
+    // Counterclockwise
+    if (IsKeyPressed(KEY_PERIOD) || ImGui::IsKeyPressed(ImGuiKey_Period)) {
+      Geometry::RotateUV(localGeometryOverlay, 3, &history);
     }
   }
 }

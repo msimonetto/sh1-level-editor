@@ -315,7 +315,7 @@ void SettingsPanel::Draw(History &history) {
         Config::Get().KeyMoveRight = KEY_D;
         Config::Get().KeyMoveUp = KEY_R;
         Config::Get().KeyMoveDown = KEY_F;
-        Config::Get().KeyMultiselect = KEY_LEFT_CONTROL;
+        Config::Get().KeyMultiselect = KEY_LEFT_SHIFT;
         break;
       }
     }
