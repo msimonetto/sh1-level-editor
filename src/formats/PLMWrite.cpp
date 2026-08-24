@@ -3,12 +3,35 @@
 #include <cmath>
 #include <cstring>
 
+namespace {
+inline void GetTextureDimensions(const std::string& texName, float& outTw, float& outTh) {
+    outTw = 256.0f;
+    outTh = 256.0f;
+    if (texName.empty()) return;
+    std::string stem = texName;
+    size_t dot = stem.find_last_of('.');
+    if (dot != std::string::npos) {
+        stem = stem.substr(0, dot);
+    }
+    while (!stem.empty() && (stem.back() == ' ' || stem.back() == '\0')) {
+        stem.pop_back();
+    }
+    if (!stem.empty() && (stem.back() == 'H' || stem.back() == 'h')) {
+        outTw = 128.0f;
+    }
+}
+} // namespace
+
 //   rawV = uv[i][1] * 256 - bias
 // bias: the original rawU/rawV arrays detect which vertex had +1 bias applied.
 // Values are rounded to nearest integer and clamped to [0, 255].
 void PLMWrite::EncodeUVs(const RenderFace& face, uint8_t outU[4], uint8_t outV[4]) {
     bool isQuad = (face.v[3] != 0xFF);
     int count = isQuad ? 4 : 3;
+
+    float tw = 256.0f;
+    float th = 256.0f;
+    GetTextureDimensions(face.texName, tw, th);
 
     // We work in the same winding order as stored in face.uv / face.v
     // but the rawU/rawV are in original pack order (u0..u3, v0..v3).
@@ -25,8 +48,8 @@ void PLMWrite::EncodeUVs(const RenderFace& face, uint8_t outU[4], uint8_t outV[4
     float pkU[4] = {}, pkV[4] = {};
     for (int fi = 0; fi < count; fi++) {
         int pi = isQuad ? faceToPackQuad[fi] : faceToPackTri[fi];
-        pkU[pi] = face.uv[fi][0] * 256.0f; // undo divide by 256
-        pkV[pi] = face.uv[fi][1] * 256.0f; // undo divide by 256 (parser does NOT Y-flip V)
+        pkU[pi] = face.uv[fi][0] * tw; // undo divide by tw
+        pkV[pi] = face.uv[fi][1] * th; // undo divide by th (parser does NOT Y-flip V)
     }
 
     // Step 2: detect which pack vertices had bias applied by finding the max

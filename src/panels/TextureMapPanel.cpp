@@ -782,8 +782,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
                       "paint the active tile.");
 
   ImGui::Separator();
-  int tw = (int)((m_currentTile.maxU - m_currentTile.minU) * 256.0f);
-  int th = (int)((m_currentTile.maxV - m_currentTile.minV) * 256.0f);
+  int activeTexW = testTexture.GetWidth() > 0 ? testTexture.GetWidth() : 256;
+  int activeTexH = testTexture.GetHeight() > 0 ? testTexture.GetHeight() : 256;
+  int tw = (int)((m_currentTile.maxU - m_currentTile.minU) * (float)activeTexW);
+  int th = (int)((m_currentTile.maxV - m_currentTile.minV) * (float)activeTexH);
   ImGui::Text("Active Tile: %s (%dx%d)",
               m_currentTile.texName.empty() ? "None"
                                             : m_currentTile.texName.c_str(),
@@ -812,11 +814,13 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     auto &t = m_recentTiles[i];
     ImGui::PushID((int)i);
 
-    int w = (int)((t.maxU - t.minU) * 256.0f);
-    int h = (int)((t.maxV - t.minV) * 256.0f);
-
     Texture2D cachedTex = TextureCache::Get().Fetch(
         t.texName, t.palette, fileManager.GetWorkspaceDir());
+
+    int ctw = cachedTex.width > 0 ? cachedTex.width : 256;
+    int cth = cachedTex.height > 0 ? cachedTex.height : 256;
+    int w = (int)((t.maxU - t.minU) * (float)ctw);
+    int h = (int)((t.maxV - t.minV) * (float)cth);
 
     ImVec2 uv0(t.minU, t.minV);
     ImVec2 uv1(t.maxU, t.maxV);

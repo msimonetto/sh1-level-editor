@@ -117,8 +117,22 @@ bool PLMParse::ParseAndPlaceObject(const uint8_t*                  buf,
         }
 
         // Determine texture dimensions for UV normalisation
-        const float tw = 256.0f;
-        const float th = 256.0f;
+        auto getTexDimensions = [](const std::string& texName, float& outTw, float& outTh) {
+            outTw = 256.0f;
+            outTh = 256.0f;
+            if (texName.empty()) return;
+            std::string stem = texName;
+            size_t dot = stem.find_last_of('.');
+            if (dot != std::string::npos) {
+                stem = stem.substr(0, dot);
+            }
+            while (!stem.empty() && (stem.back() == ' ' || stem.back() == '\0')) {
+                stem.pop_back();
+            }
+            if (!stem.empty() && (stem.back() == 'H' || stem.back() == 'h')) {
+                outTw = 128.0f;
+            }
+        };
 
         // Build faces
         for (int p = 0; p < dh->pack_num; ++p) {
@@ -141,6 +155,15 @@ bool PLMParse::ParseAndPlaceObject(const uint8_t*                  buf,
                        outObj.name.c_str(), m, p, maxIdx, dh->vert_num);
                 continue;
             }
+
+            std::string tName = "";
+            if (texNum != 0x7F && texNum < texNames.size()) {
+                tName = texNames[texNum];
+            }
+
+            float tw = 256.0f;
+            float th = 256.0f;
+            getTexDimensions(tName, tw, th);
 
             // UV bias (port of coordinate_math)
             uint8_t uArr[4] = { pk->u0, pk->u1, pk->u2, pk->u3 };
@@ -169,11 +192,7 @@ bool PLMParse::ParseAndPlaceObject(const uint8_t*                  buf,
 
             RenderFace face;
             face.texNum    = texNum;
-            if (texNum != 0x7F && texNum < texNames.size()) {
-                face.texName = texNames[texNum];
-            } else {
-                face.texName = "";
-            }
+            face.texName   = tName;
             face.paletteRow = palRow;
             face.cbaRaw    = cbaRaw;
 
