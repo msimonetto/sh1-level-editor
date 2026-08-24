@@ -1,4 +1,4 @@
-#include "panels/TextureMap.h"
+#include "panels/TextureMapPanel.h"
 #include "viewport/Viewport.h"
 #include "core/Config.h"
 #include "core/FileDialog.h"

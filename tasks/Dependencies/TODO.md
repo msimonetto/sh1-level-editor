@@ -8,7 +8,7 @@
 - `[x]` **Dictionary / Alias Manager (Logic)**
   - Spun off chunk aliases and prefix name mappings from `ChunkManager` into a new polymorphically available `core/Dictionary` module.
 - `[x]` **Dependencies Panel Boilerplate**
-  - Created `panels/Dependencies` header/source, wired up to `main.cpp`, and removed the obsolete dependencies UI from `panels/Chunks`.
+  - Created `panels/DependenciesPanel` header/source, wired up to `main.cpp`, and removed the obsolete dependencies UI from `panels/ChunksPanel`.
 
 ## Up Next (In Progress / Pending)
 

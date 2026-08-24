@@ -1,4 +1,4 @@
-#include "panels/Menu.h"
+#include "panels/MenuPanel.h"
 
 #include "imgui.h"
 #include "extras/IconsFontAwesome6.h"

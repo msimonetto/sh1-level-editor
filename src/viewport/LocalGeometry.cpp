@@ -4,7 +4,7 @@
 #include "core/History.h"
 #include "formats/IPDParse.h"
 #include "core/Textures.h"
-#include "panels/TextureMap.h"
+#include "panels/TextureMapPanel.h"
 #include "viewport/Viewport.h"
 #include "imgui.h"
 #include "raymath.h"

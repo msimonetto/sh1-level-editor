@@ -1,4 +1,4 @@
-#include "panels/Settings.h"
+#include "panels/SettingsPanel.h"
 #include "core/Config.h"
 #include "core/History.h"
 #include "core/FileDialog.h"

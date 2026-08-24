@@ -1,6 +1,6 @@
 #pragma once
-#include "panels/LocalGeometry.h"
-#include "panels/Waypoints.h"
+#include "panels/LocalGeometryPanel.h"
+#include "panels/WaypointsPanel.h"
 #include <string>
 
 class ViewportBase;

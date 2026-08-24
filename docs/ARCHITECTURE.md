@@ -218,13 +218,13 @@ PlayStation `.TIM` texture loader and CLUT palette manager.
 
 Modular ImGui windows providing specialized editing controls and inspectors.
 
-### `Chunks.h`
+### `ChunksPanel.h`
 - **`ChunksPanel`**: Renders the 2D chunk grid overview, prefix selector, deployment/extraction action buttons, interactive status console, and pipeline progress modals.
 
-### `Dependencies.h`
+### `DependenciesPanel.h`
 - **`DependenciesPanel`**: Workspace file manager. Provides asset library browsing, dependency inspection, and safe asset import/removal.
 
-### `LocalGeometry.h`
+### `LocalGeometryPanel.h`
 - **`LocalGeometryPanel`**: Blender-inspired 3D modeling tool panel. Organizes tools across 4 modes:
   1. *Global Objects*: Instantiated `_GLB.PLM` props, yaw rotation, grid/floor snapping, duplicate, mirror, delete.
   2. *Meshes*: Whole-mesh translation, 90° axis rotation, axis mirroring, floor snapping, mesh merging/separation, primitive spawning (planes, cubes, slopes), pivot centering, chunk migration.
@@ -232,30 +232,30 @@ Modular ImGui windows providing specialized editing controls and inspectors.
   4. *Vertices*: Power-of-two grid snapping, floor snapping, XYZ planarization, new face creation from 3/4 points, vertex/edge extrusion, tolerance welding, vertex deletion.
   - *Validation*: Runs `ChunkValidator` on demand and renders interactive warnings/errors with jump-to-element buttons.
 
-### `Maps.h`
+### `MapsPanel.h`
 - **`MapsPanel`**: Map registry browser listing all 43 game map sections with search filtering, overlay loading triggers, and C decomp export actions.
 
-### `Menu.h`
+### `MenuPanel.h`
 - **`MenuPanel`**: Top application menu bar. Routes File operations (Save, Revert, Open Directories, Quit), Edit operations (Undo/Redo history), Panels visibility toggles, Viewport controls, and Help documentation.
 
-### `Outliner.h`
+### `OutlinerPanel.h`
 - **`OutlinerPanel`**: Scene hierarchy treeview showing loaded chunks, objects, and meshes with visibility checkboxes, alias labels, and selection sync.
 
-### `Settings.h`
+### `SettingsPanel.h`
 - **`SettingsPanel`**: Editor preferences panel for editing paths, interface theme colors, grid dimensions, wireframe settings, keybindings, and undo buffer depth.
 
-### `TextureEdit.h`
+### `TextureEditPanel.h`
 - **`TextureEditPanel`**: 2D texture editing canvas for manipulating individual UV vertices, viewing CLUT color tables, and editing raw pixel textures.
 
-### `TextureMap.h`
+### `TextureMapPanel.h`
 - **`SelectedTile`**: Bounding box representing active UV tile selection.
 - **`TextureMapPanel`**: Texture palette browser. Displays loaded TIMs, CLUT row selector, tile grid picker, and controls for 3D face paint mode.
 
-### `ViewportTools.h`
+### `ViewportToolsPanel.h`
 - **`ViewportMode`**: Enum defining active editor viewport modes (`Scene`, `LocalGeometry`, `Collision`, `DoorsAndWaypoints`, `Spawns`, `Camera`, `Audio`, `TextureEditor`).
 - **`ViewportToolsPanel`**: Tabbed conduit panel hosting mode selectors and delegating content drawing to active mode inspectors (`LocalGeometryPanel`, `WaypointsPanel`, etc.).
 
-### `Waypoints.h`
+### `WaypointsPanel.h`
 - **`WaypointsPanel`**: Inspector for door triggers and navigation waypoints. Provides controls for arrival angles, trigger volumes (AABB, Facing, OBB), destination maps, system states, and door linking.
 
 ---

@@ -74,11 +74,11 @@ The high-level technical evolution of the editor is structured across five major
 - 2D UV canvas in `TextureEditPanel` for pixel-level inspection and UV coordinate adjustment.
 - GPU texture caching via `TextureCache` in `Textures.h`.
 
-### D. Outliner & Scene Hierarchy (`include/panels/Outliner.h`)
+### D. Outliner & Scene Hierarchy (`include/panels/OutlinerPanel.h`)
 - **Status:** **Active.**
 - Treeview of loaded chunks, objects, and submeshes with visibility toggling and selection synchronization.
 
-### E. Map Registry & Overlay Director (`include/core/`, `include/panels/Maps.h`)
+### E. Map Registry & Overlay Director (`include/core/`, `include/panels/MapsPanel.h`)
 - **Status:** **Active.**
 - 43-map registry (`MapTable.h`) with search filtering, overlay loading (`OverlayLoader.h`), and 3D waypoint visualization.
 

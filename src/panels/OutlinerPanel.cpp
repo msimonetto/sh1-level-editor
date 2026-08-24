@@ -1,4 +1,4 @@
-#include "panels/Outliner.h"
+#include "panels/OutlinerPanel.h"
 #include "imgui.h"
 #include "viewport/Viewport.h"
 #include "viewport/LocalGeometry.h"

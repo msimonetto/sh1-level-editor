@@ -1,3 +1,9 @@
+// OBJ export mainly adapted from sh_ipd2obj but not exactly, the degree of similarity is unverified
+//
+// Issues in current implementation:
+// - All textures/CLUT row combinations are exported (inefficient)
+// - Textures are clipped incorrectly at its seams (use THR0000 road PLMs as an example)
+
 #include "formats/OBJExport.h"
 #include "formats/TIMDecoder.h"
 #include "core/FileManager.h"

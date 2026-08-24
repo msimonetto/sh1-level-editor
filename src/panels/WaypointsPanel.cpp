@@ -1,4 +1,4 @@
-#include "panels/Waypoints.h"
+#include "panels/WaypointsPanel.h"
 #include "core/History.h"
 #include "imgui.h"
 #include "formats/OverlayLoader.h"

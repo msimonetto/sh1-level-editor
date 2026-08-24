@@ -1,7 +1,7 @@
 #include "geometry/FaceOperations.h"
 #include "geometry/MeshOperations.h"
 #include "viewport/LocalGeometry.h"
-#include "panels/TextureMap.h"
+#include "panels/TextureMapPanel.h"
 #include "core/History.h"
 #include "formats/IPDWrite.h"
 #include "raymath.h"

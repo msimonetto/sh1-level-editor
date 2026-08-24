@@ -1,4 +1,4 @@
-#include "panels/LocalGeometry.h"
+#include "panels/LocalGeometryPanel.h"
 #include "viewport/LocalGeometry.h"
 #include "core/History.h"
 #include "geometry/ChunkValidator.h"
@@ -7,7 +7,7 @@
 #include "geometry/GlobalObjectOperations.h"
 #include "geometry/FaceOperations.h"
 #include "geometry/VertexOperations.h"
-#include "panels/TextureMap.h"
+#include "panels/TextureMapPanel.h"
 #include "imgui.h"
 #include "extras/IconsFontAwesome6.h"
 #include <cfloat>

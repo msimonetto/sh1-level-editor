@@ -1,4 +1,4 @@
-#include "panels/TextureEdit.h"
+#include "panels/TextureEditPanel.h"
 #include <algorithm>
 #include <cmath>
 

@@ -1,4 +1,4 @@
-#include "panels/Dependencies.h"
+#include "panels/DependenciesPanel.h"
 #include "imgui.h"
 #include "extras/IconsFontAwesome6.h"
 

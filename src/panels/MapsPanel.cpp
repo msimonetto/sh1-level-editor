@@ -1,4 +1,4 @@
-#include "panels/Maps.h"
+#include "panels/MapsPanel.h"
 #include "core/FileManager.h"
 #include "core/MapTable.h"
 #include "formats/OverlayLoader.h"

@@ -4,7 +4,7 @@
 #include "rlgl.h"
 #include "viewport/ViewportBase.h"
 #include "viewport/LocalGeometry.h"
-#include "panels/ViewportTools.h"
+#include "panels/ViewportToolsPanel.h"
 #include <string>
 #include <vector>
 class CollisionOverlay;

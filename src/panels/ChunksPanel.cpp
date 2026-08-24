@@ -1,4 +1,4 @@
-#include "panels/Chunks.h"
+#include "panels/ChunksPanel.h"
 #include "core/FileManager.h"
 #include "core/Config.h"
 #include "core/History.h"

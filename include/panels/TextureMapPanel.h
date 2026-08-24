@@ -7,7 +7,7 @@
 #include "raylib.h"
 #include "viewport/LocalGeometry.h"
 #include "viewport/Scene.h"
-#include "panels/TextureEdit.h"
+#include "panels/TextureEditPanel.h"
 #include <deque>
 #include <set>
 #include <string>
