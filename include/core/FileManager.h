@@ -6,7 +6,7 @@
 #include <functional>
 #include <filesystem>
 #include "formats/Structs.h"
-#include "core/OBJ.h"
+#include "formats/OBJExport.h"
 #include "core/Patcher.h"
 
 struct ChunkInfo {
@@ -52,6 +52,7 @@ public:
     bool DeleteSelected(const std::string& targetType, const std::vector<std::string>& chunks, bool deleteTextures, const std::string& workspaceDir, const std::string& overrideDir, const std::string& projectDir);
     bool ClearEntire(const std::string& targetType, const std::string& workspaceDir, const std::string& overrideDir, const std::string& projectDir);
     bool RevertSelected(const std::vector<std::string>& chunks, bool revertDependencies, const std::string& workspaceDir, const std::string& assetsDir);
+    bool ExportToOBJ(const std::vector<std::string>& chunks, const std::string& workspaceDir, const std::string& assetsDir, const std::string& projectDir);
     
     // Kept as script invocation since it deals with C generation
     bool DeployOverlayToDecomp(const std::string& mapKey);

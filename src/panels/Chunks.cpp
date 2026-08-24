@@ -612,6 +612,19 @@ void ChunksPanel::Draw(FileManager& mgr, Dictionary& dict, DependencyManager& de
     }
 
     ImGui::Separator();
+    ImGui::Text(ICON_FA_FILE_EXPORT " Export");
+
+    if (ImGui::Button(ICON_FA_BORDER_ALL " Export Selection as OBJ", ImVec2(fullWidth, 0))) {
+      std::vector<std::string> chunks = mgr.m_selectedChunks;
+      std::string comp = mgr.GetAssetsDir();
+      std::string work = mgr.GetWorkspaceDir();
+      std::string proj = Config::Get().ProjectDirectory;
+      std::thread([&mgr, chunks, comp, work, proj]() {
+        mgr.ExportToOBJ(chunks, work, comp, proj);
+      }).detach();
+    }
+
+    ImGui::Separator();
     ImGui::Text(ICON_FA_SCREWDRIVER_WRENCH " Engine Patches");
 
     std::vector<std::string> needsPatchingChunks;

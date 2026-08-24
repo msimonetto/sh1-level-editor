@@ -10,11 +10,13 @@ This document provides a comprehensive, structured reference for the C++ Level E
 sh1-level-editor/
 ├── include/                  # C++ Header Files (public interface)
 │   ├── core/                 # Engine logic, binary parsers, state managers, config
+│   ├── formats/              # Binary format parsers, writers, caches (IPD, PLM, TIM, OBJ)
 │   ├── geometry/             # 3D mesh operations, topology editing, constraints validation
 │   ├── panels/               # ImGui UI windows, inspectors, mode-specific toolbars
 │   └── viewport/             # Raylib 3D viewports, cameras, overlays, renderers
 ├── src/                      # C++ Source Files (implementation mirrored from include/)
 │   ├── core/
+│   ├── formats/
 │   ├── geometry/
 │   ├── panels/
 │   ├── viewport/
@@ -24,7 +26,7 @@ sh1-level-editor/
 │   ├── imgui/                # Immediate-mode GUI library (docking branch)
 │   └── rlImGui/              # Raylib <-> ImGui integration layer
 ├── scripts/                  # Python Asset Pipeline (conversion & extraction engine)
-│   ├── backend/              # CLI endpoints invoked natively by C++ AssetManager
+│   ├── backend/              # CLI endpoints invoked natively by C++ FileManager
 │   ├── core/                 # Modular low-level format parsers and converters
 │   ├── batch/                # Batch processing scripts for full disc extraction
 │   └── convert.py            # Unified CLI wrapper for asset conversions
@@ -46,27 +48,24 @@ sh1-level-editor/
 
 Responsible for binary format parsing, patch serialization, undo/redo history, asset management, and configuration.
 
-### `AssetManager.h`
-Native C++ wrapper executing backend Python asset conversion scripts.
-- **`AssetManager`**:
-  - `SetLogCallback(LogCallback cb)` / `SetProgressCallback(ProgressCallback cb)`: Async UI progress tracking.
-  - `ExtractToWorkspace(chunks, completeDir, workspaceDir, projectDir)`: Copies and converts raw disc assets into editable workspace files.
-  - `DeployToTarget(chunks, workspaceDir, overrideDir, projectDir)`: Repacks workspace assets into target game directory.
-  - `DeleteSelected(targetType, chunks, deleteTextures, workspaceDir, overrideDir, projectDir)`: Safely removes chunk files.
-  - `ClearEntire(targetType, workspaceDir, overrideDir, projectDir)`: Purges all files from workspace or override directories.
-  - `RevertSelected(chunks, revertDependencies, workspaceDir, assetsDir)`: Restores workspace assets from original disc backup.
-  - `DeployOverlayToDecomp(mapKey)`: Exports waypoint and event overlays to C decomp header files.
-
-### `ChunkManager.h`
-Tracks available chunk assets, grid coordinates, selection states, and reload queues.
+### `FileManager.h`
+Central workspace and asset management engine. Coordinates filesystem operations, chunk discovery, multi-selection, viewport reload queues, native asset deployment/extraction pipelines, and OBJ exporting.
 - **`ChunkInfo`**: Metadata struct containing `name`, `prefix`, grid coordinates `(x, z)`, and `hasCoords`.
-- **`ChunkManager`**:
+- **`FileManager`**:
+  - `SetLogCallback(LogCallback cb)` / `SetProgressCallback(ProgressCallback cb)`: Async UI progress tracking and console logging.
   - `GetSelectedChunks()`, `SetSelectedChunks()`: Tracks active multiselect chunks.
   - `GetSelectedPrefix()`: Returns the currently active prefix (e.g. `"THR"`, `"SC"`, `"SU"`).
   - `GetViewportChunks()`, `SetViewportChunks()`: Chunks actively loaded into the 3D scene.
   - `QueueReloadChunks()`, `ConsumeReloadChunks()`: Thread-safe queue for notifying viewports of file changes.
-  - `GetWorkspaceDir()`, `GetAssetsDir()`, `GetOverrideDir()`: Path resolution helpers.
-  - `ScanAssets()`: Scans filesystem and parses chunk coordinate headers to populate grid.
+  - `GetWorkspaceDir()`, `GetAssetsDir()`, `GetOverrideDir()`, `GetBuildDir()`, `GetGameBinSource()`: Path resolution helpers.
+  - `ScanAssets()`: Scans filesystem and parses chunk coordinate headers to populate the grid.
+  - `ExtractToWorkspace(chunks, completeDir, workspaceDir, projectDir)`: Copies and converts raw disc assets into editable workspace files.
+  - `DeployToTarget(chunks, workspaceDir, overrideDir, projectDir)`: Smart deployment that repacks workspace assets into target game directory.
+  - `DeleteSelected(targetType, chunks, deleteTextures, workspaceDir, overrideDir, projectDir)`: Safely removes selected chunk files.
+  - `ClearEntire(targetType, workspaceDir, overrideDir, projectDir)`: Purges all files from workspace or override directories.
+  - `RevertSelected(chunks, revertDependencies, workspaceDir, assetsDir)`: Restores workspace assets from original disc backup.
+  - `ExportToOBJ(chunks, workspaceDir, assetsDir, projectDir)`: Native exporter for selected chunks and their dependencies to Wavefront `.obj`, `.mtl`, and baked `.png` textures.
+  - `DeployOverlayToDecomp(mapKey)`: Exports waypoint and event overlays to C decomp header files.
   - `Log()`: Dispatches console messages.
 
 ### `Config.h`
@@ -137,21 +136,6 @@ Thread-safe in-memory cache for PlayStation 1 `_GLB.PLM` binary asset libraries.
   - `Invalidate(glbPath)`: Evicts modified file from cache on save.
   - `Clear()`: Flushes all cached GLB files on workspace lifecycle operations.
 
-### `IPDParse.h`
-Low-level parser for PlayStation 1 `.IPD` (world geometry) and standalone `_GLB.PLM` binary files.
-- **Coordinate System Constants**: `IPD_SCALE = 1.0f / 256.0f`, `IPD_MAP_MAX = 10240.0f`.
-- **`DeriveChunkPrefix(name)`**: Utility to extract prefix from standard 8-character chunk names.
-- **`FaceAddress`**: Canonical address of a polygon in binary (`plmObjectName`, `meshIdx`, `packIdx`, `isGlobal`, `packRawOffset`).
-- **`RenderFace`**: Decoded polygon primitive containing vertex indices `v[4]`, normalized `uv[4][2]`, `paletteRow`, `texNum`, `texName`, raw UV bytes `rawU[4]`/`rawV[4]`, normal indices, and raw CBA words.
-- **`RenderMesh`**: Container for local vertex arrays `(vx, vy, vz)` and constituent `faces`.
-- **`RenderObject`**: Placed 3D model instance (`PLM_OBJ_HEADER`) with local meshes, world transform matrix `rt[3][3]`, translation `(rawTx, rawTy, rawTz)`, bounding box, and `.IPD` file offset.
-- **`RenderBatch`**: Geometry grouped by `(texName, paletteRow)` with interleaved positions and UVs for fast GPU rendering.
-- **`ParsedCollision`**: Extracted physics collision data (`splitVertices`, `surfaces`, `subcells`, `grid`, and indirection tables).
-- **`ParsedChunk`**: Top-level chunk structure containing collision, local/global texture names, placed objects, and render batches.
-- **`IPDParse`**:
-  - `Parse(ipdPath, workspaceDir, outChunk)`: Parses complete `.IPD` file and associated `_GLB.PLM`.
-  - `BuildBatches(chunk)`: Flattens object geometry into GPU-ready draw batches.
-
 ### `IPDWrite.h`
 Intelligent section-aware binary patch writer that writes in-memory geometry edits back to `.IPD` and `.PLM` files.
 - **`IPDWrite`**:
@@ -167,9 +151,10 @@ Registry table mapping 43 decomp-verified Silent Hill map sections.
 - **`MapInfoEntry`**: Structure containing `key` (e.g. `"MAP0_S00"`), `prefix` (e.g. `"THR"`), and `description`.
 - **`MAP_REGISTRY_TABLE`**: Complete constant lookup array of all 43 game map overlays.
 
-### `OBJ.h`
+### `OBJExport.h`
 Wavefront `.OBJ` geometry exporter.
-- **`OBJ::Export(chunk, outputPath)`**: Converts parsed chunk geometry into standard `.obj` mesh files.
+- **`OBJExport::ExportChunk(chunk, outObjPath, workspaceDir, assetsDir, exportCollision)`**: Converts parsed chunk geometry into standard `.obj` mesh, `.mtl` material definitions, and baked `.png` textures.
+- **`OBJExport::Export(inspector, depMgr, outputPath, exportCollision)`**: Generic export interface.
 
 ### `OverlayLoader.h`
 Parses and serializes map director overlay data (`map_points.json` and `events.json`).
@@ -197,7 +182,7 @@ Parser for PlayStation 1 `.PLM` models and standalone `_GLB.PLM` binary asset li
 ### `Shortcuts.h`
 Global keyboard shortcut router.
 - **`Shortcuts`**:
-  - `Handle(history, chunkMgr, viewport, localGeoOverlay, waypointsOverlay)`: Dispatches keyboard hotkeys (Undo, Redo, Save, Deselect, Camera Focus, Mode switching).
+  - `Handle(history, fileMgr, viewport, localGeoOverlay, waypointsOverlay)`: Dispatches keyboard hotkeys (Undo, Redo, Save, Deselect, Camera Focus, Mode switching).
   - `SaveSelected()`, `SaveAll()`: Triggers patch writer pipeline for active workspace assets.
 
 ### `Structs.h`
@@ -318,7 +303,7 @@ The unified visual geometry renderer and host for viewport overlays.
 - **`LocalGeometryOverlay`**: The central interactive 3D editing layer. Handles raycast picking, box selection, transform gizmo manipulation, vertex/face highlighting, and wireframe overlays.
 
 ### `Sync.h`
-- **`ViewportSync`**: Coordinates asynchronous background chunk loading and synchronizes loaded state between `ChunkManager`, `Viewport`, and `LocalGeometryOverlay`.
+- **`ViewportSync`**: Coordinates asynchronous background chunk loading and synchronizes loaded state between `FileManager`, `Viewport`, and `LocalGeometryOverlay`.
 
 ### `Waypoints.h`
 - **`WaypointsOverlay`**: Renders 3D waypoint pins, orientation arrows, color-coded door trigger volumes, and spline curves linking connected rooms.

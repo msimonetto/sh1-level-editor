@@ -2,6 +2,9 @@
 #include "core/Config.h"
 #include "core/DependencyManager.h"
 #include "formats/PLMParse.h"
+#include "formats/IPDParse.h"
+#include "formats/OBJExport.h"
+#include "formats/GlobalCache.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -406,3 +409,116 @@ bool FileManager::DeployOverlayToDecomp(const std::string& mapKey) {
     Log("[DEPLOY OVERLAY] Complete.");
     return true;
 }
+
+bool FileManager::ExportToOBJ(const std::vector<std::string>& chunks, const std::string& workspaceDir, const std::string& assetsDir, const std::string& projectDir) {
+    if (chunks.empty()) {
+        Log("[EXPORT OBJ] No chunks selected to export.", true);
+        return false;
+    }
+
+    Log("[EXPORT OBJ] Starting native OBJ export for " + std::to_string(chunks.size()) + " chunk(s)...");
+
+    fs::path workDir = fs::path(workspaceDir);
+    fs::path astDir = fs::path(assetsDir);
+    fs::path srcBg = fs::exists(astDir / "BG") ? (astDir / "BG") : astDir;
+    fs::path objDir = workDir / "OBJ";
+
+    fs::create_directories(objDir);
+    fs::create_directories(workDir / "IPD");
+    fs::create_directories(workDir / "PLM");
+    fs::create_directories(workDir / "TIM");
+
+    DependencyManager depMgr(workspaceDir);
+
+    // 1. Ensure dependency requirements are met for all selected chunks
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        const std::string& chunk = chunks[i];
+        std::string prefix = chunk;
+        if (chunk.length() > 4) prefix = chunk.substr(0, chunk.length() - 4);
+
+        // Copy IPD if not in workspace
+        fs::path targetIpd = workDir / "IPD" / (chunk + ".IPD");
+        if (!fs::exists(targetIpd)) {
+            fs::path sourceIpd = srcBg / (chunk + ".IPD");
+            if (fs::exists(sourceIpd)) {
+                fs::copy_file(sourceIpd, targetIpd, fs::copy_options::overwrite_existing);
+            } else {
+                Log("[EXPORT OBJ] " + chunk + ".IPD not found in workspace or assets.", true);
+            }
+        }
+
+        // Ensure global PLM is present
+        fs::path wsGlb = workDir / "PLM" / (prefix + "_GLB.PLM");
+        if (!fs::exists(wsGlb)) {
+            fs::path srcGlb = srcBg / (prefix + "_GLB.PLM");
+            if (!fs::exists(srcGlb) && fs::exists(astDir / (prefix + "_GLB.PLM"))) {
+                srcGlb = astDir / (prefix + "_GLB.PLM");
+            }
+            if (fs::exists(srcGlb)) {
+                fs::copy_file(srcGlb, wsGlb, fs::copy_options::overwrite_existing);
+            }
+        }
+
+        // Copy matching TIM and PLM dependencies from assets if missing
+        std::string prefix2 = chunk.substr(0, 2);
+        std::string prefix3 = chunk.length() >= 3 ? chunk.substr(0, 3) : prefix2;
+        if (fs::exists(srcBg)) {
+            for (const auto& entry : fs::directory_iterator(srcBg)) {
+                if (!entry.is_regular_file()) continue;
+                std::string fname = entry.path().filename().string();
+                if (fname.rfind(prefix3, 0) == 0 || fname.rfind(prefix2, 0) == 0) {
+                    std::string ext = entry.path().extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::toupper);
+                    if (ext == ".TIM") {
+                        fs::path tgt = workDir / "TIM" / fname;
+                        if (!fs::exists(tgt)) {
+                            fs::copy_file(entry.path(), tgt, fs::copy_options::overwrite_existing);
+                        }
+                        depMgr.AddDependency(prefix, chunk, "textures", fname);
+                    } else if (ext == ".PLM") {
+                        fs::path tgt = workDir / "PLM" / fname;
+                        if (!fs::exists(tgt)) {
+                            fs::copy_file(entry.path(), tgt, fs::copy_options::overwrite_existing);
+                        }
+                        depMgr.AddDependency(prefix, chunk, "geometry", fname);
+                    }
+                }
+            }
+        }
+
+        if (m_progressCallback) m_progressCallback((int)(i + 1), (int)(chunks.size() * 2), "Resolving dependencies for " + chunk);
+    }
+
+    depMgr.Save();
+
+    // 2. Parse and export each chunk
+    int successCount = 0;
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        const std::string& chunk = chunks[i];
+        fs::path ipdPath = workDir / "IPD" / (chunk + ".IPD");
+        if (!fs::exists(ipdPath)) {
+            Log("[EXPORT OBJ] Cannot export " + chunk + ": IPD file missing.", true);
+            continue;
+        }
+
+        ParsedChunk parsedChunk;
+        if (!IPDParse::Parse(ipdPath.string(), workspaceDir, parsedChunk)) {
+            Log("[EXPORT OBJ] Failed to parse " + chunk + ".IPD.", true);
+            continue;
+        }
+
+        std::string outObjPath = (objDir / (chunk + ".obj")).string();
+        if (OBJExport::ExportChunk(parsedChunk, outObjPath, workspaceDir, assetsDir, true)) {
+            successCount++;
+            Log("[EXPORT OBJ] Exported: " + chunk + " -> " + outObjPath);
+        } else {
+            Log("[EXPORT OBJ] Failed to export " + chunk + " to OBJ.", true);
+        }
+
+        if (m_progressCallback) m_progressCallback((int)(chunks.size() + i + 1), (int)(chunks.size() * 2), "Exported " + chunk + ".obj");
+    }
+
+    Log("[EXPORT OBJ] Complete (" + std::to_string(successCount) + "/" + std::to_string(chunks.size()) + " chunk(s) exported to " + objDir.string() + ").");
+    return (successCount > 0);
+}
+
