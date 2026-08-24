@@ -91,6 +91,8 @@ void TextureMapPanel::LoadRecentTiles(const std::string &workspaceDir) {
       }
     }
   }
+  std::stable_partition(m_recentTiles.begin(), m_recentTiles.end(),
+                        [](const SelectedTile &t) { return t.isPinned; });
 }
 
 void TextureMapPanel::PushRecentTile(const SelectedTile &tile) {
@@ -104,6 +106,8 @@ void TextureMapPanel::PushRecentTile(const SelectedTile &tile) {
   SelectedTile newTile = tile;
   newTile.isPinned = wasPinned;
   m_recentTiles.push_front(newTile);
+  std::stable_partition(m_recentTiles.begin(), m_recentTiles.end(),
+                        [](const SelectedTile &t) { return t.isPinned; });
 
   if (m_recentTiles.size() > m_maxRecentTiles) {
     for (auto rit = m_recentTiles.rbegin(); rit != m_recentTiles.rend();
@@ -215,6 +219,30 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
         currentPalette = activeFace->paletteRow;
         testTexture.ApplyPalette(currentPalette);
       }
+
+      // Automatically add selected face tile to recent tiles cache
+      float minU = activeFace->uv[0][0];
+      float maxU = activeFace->uv[0][0];
+      float minV = activeFace->uv[0][1];
+      float maxV = activeFace->uv[0][1];
+      int nVerts = (activeFace->v[3] == 0xFF) ? 3 : 4;
+      for (int i = 1; i < nVerts; ++i) {
+        minU = std::min(minU, activeFace->uv[i][0]);
+        maxU = std::max(maxU, activeFace->uv[i][0]);
+        minV = std::min(minV, activeFace->uv[i][1]);
+        maxV = std::max(maxV, activeFace->uv[i][1]);
+      }
+
+      m_currentTile.minU = minU;
+      m_currentTile.minV = minV;
+      m_currentTile.maxU = maxU;
+      m_currentTile.maxV = maxV;
+      m_currentTile.rotationSteps = 0;
+      m_currentTile.texName = activeFace->texName;
+      m_currentTile.palette = activeFace->paletteRow;
+
+      PushRecentTile(m_currentTile);
+      SaveRecentTiles(fileManager.GetWorkspaceDir());
     }
   }
 
@@ -952,71 +980,134 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     SaveRecentTiles(fileManager.GetWorkspaceDir());
   }
 
-  ImGui::BeginChild("RecentTilesScroll", ImVec2(0, 90), true,
-                    ImGuiWindowFlags_HorizontalScrollbar);
-  for (size_t i = 0; i < m_recentTiles.size(); i++) {
-    auto &t = m_recentTiles[i];
-    ImGui::PushID((int)i);
+  float availW = ImGui::GetContentRegionAvail().x;
+  float tileScale = Config::Get().TextureScale > 0.05f ? Config::Get().TextureScale : (availW / 256.0f);
+  if (tileScale <= 0.05f) tileScale = 1.0f;
+
+  float defaultTileSize = std::round(32.0f * tileScale);
+  if (defaultTileSize < 16.0f) defaultTileSize = 32.0f;
+
+  int cols = (int)(availW / defaultTileSize);
+  if (cols < 1) cols = 1;
+
+  float scrollChildH = defaultTileSize * 2.0f + 4.0f;
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+
+  ImGui::BeginChild("RecentTilesGrid", ImVec2(0, scrollChildH), true);
+
+  auto drawTileItem = [&](size_t idx) {
+    if (idx >= m_recentTiles.size()) return;
+    auto &t = m_recentTiles[idx];
+    ImGui::PushID((int)idx);
 
     Texture2D cachedTex = TextureCache::Get().Fetch(
         t.texName, t.palette, fileManager.GetWorkspaceDir());
 
     int ctw = cachedTex.width > 0 ? cachedTex.width : 256;
     int cth = cachedTex.height > 0 ? cachedTex.height : 256;
-    int w = (int)((t.maxU - t.minU) * (float)ctw);
-    int h = (int)((t.maxV - t.minV) * (float)cth);
+    float tw = (t.maxU - t.minU) * (float)ctw;
+    float th = (t.maxV - t.minV) * (float)cth;
+
+    float displayW = defaultTileSize;
+    float displayH = defaultTileSize;
 
     ImVec2 uv0(t.minU, t.minV);
     ImVec2 uv1(t.maxU, t.maxV);
 
-    ImVec4 bgCol =
-        t.isPinned ? ImVec4(0.8f, 0.6f, 0.0f, 1.0f) : ImVec4(0, 0, 0, 0);
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImVec2 p1(p0.x + displayW, p0.y + displayH);
+
+    ImGui::InvisibleButton("##TileBtn", ImVec2(displayW, displayH));
+    bool isHovered = ImGui::IsItemHovered();
+    bool isClicked = isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+    bool isRightClicked = isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
 
     if (cachedTex.id != 0) {
-      if (ImGui::ImageButton("##RecentTileImage",
-                             (ImTextureID)(intptr_t)cachedTex.id,
-                             ImVec2(64, 64), uv0, uv1, bgCol)) {
-        m_currentTile = t;
-        // Also update the main Texture Manager view
-        std::string expectedPath = fileManager.GetWorkspaceDir() +
-                                   "/TIM/" + t.texName + ".TIM";
-        if (Config::Get().LastTexturePath != expectedPath) {
-          if (testTexture.Load(expectedPath)) {
-            Config::Get().LastTexturePath = expectedPath;
-            Config::Get().Save();
-          }
-        }
-        if (currentPalette != t.palette) {
-          currentPalette = t.palette;
-          testTexture.ApplyPalette(currentPalette);
-        }
-      }
+      drawList->AddImage((ImTextureID)(intptr_t)cachedTex.id, p0, p1, uv0, uv1, IM_COL32(255, 255, 255, 255));
     } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%s\n%dx%d", t.texName.c_str(), w, h);
-      if (t.isPinned)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.6f, 0.0f, 1.0f));
-      if (ImGui::Button(buf, ImVec2(64, 64))) {
-        m_currentTile = t;
-      }
-      if (t.isPinned)
-        ImGui::PopStyleColor();
+      drawList->AddRectFilled(p0, p1, IM_COL32(40, 40, 48, 255));
+      drawList->AddText(ImVec2(p0.x + 2, p0.y + 2), IM_COL32(180, 180, 180, 255), t.texName.c_str());
     }
 
-    if (ImGui::IsItemHovered() &&
-        ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    bool isCurrent = (m_currentTile.texName == t.texName &&
+                      std::abs(m_currentTile.minU - t.minU) < 0.001f &&
+                      std::abs(m_currentTile.minV - t.minV) < 0.001f &&
+                      m_currentTile.palette == t.palette);
+
+    if (isCurrent) {
+      drawList->AddRect(p0, p1, IM_COL32(0, 220, 255, 255), 0.0f, 0, 2.0f);
+    } else if (isHovered) {
+      drawList->AddRect(p0, p1, IM_COL32(255, 255, 255, 180), 0.0f, 0, 1.0f);
+    }
+
+    if (t.isPinned) {
+      float pinX = p1.x - 7.0f;
+      float pinY = p0.y + 7.0f;
+
+      drawList->AddCircleFilled(ImVec2(pinX, pinY), 5.5f, IM_COL32(0, 0, 0, 190));
+      drawList->AddCircle(ImVec2(pinX, pinY), 5.5f, IM_COL32(255, 200, 0, 220), 0, 1.0f);
+      drawList->AddCircleFilled(ImVec2(pinX + 1.0f, pinY - 1.5f), 2.0f, IM_COL32(255, 220, 50, 255));
+      drawList->AddLine(ImVec2(pinX + 0.5f, pinY - 0.5f), ImVec2(pinX - 2.0f, pinY + 2.0f), IM_COL32(230, 230, 230, 255), 1.5f);
+    }
+
+    if (isClicked) {
+      m_currentTile = t;
+      std::string expectedPath = fileManager.GetWorkspaceDir() + "/TIM/" + t.texName + ".TIM";
+      if (Config::Get().LastTexturePath != expectedPath) {
+        if (testTexture.Load(expectedPath)) {
+          Config::Get().LastTexturePath = expectedPath;
+          Config::Get().Save();
+        }
+      }
+      if (currentPalette != t.palette) {
+        currentPalette = t.palette;
+        testTexture.ApplyPalette(currentPalette);
+      }
+    }
+
+    if (isRightClicked) {
       t.isPinned = !t.isPinned;
+      std::stable_partition(m_recentTiles.begin(), m_recentTiles.end(),
+                            [](const SelectedTile &st) { return st.isPinned; });
       SaveRecentTiles(fileManager.GetWorkspaceDir());
     }
 
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("%s (Palette %d) - %dx%d", t.texName.c_str(), t.palette,
-                        w, h);
+    if (isHovered) {
+      ImGui::BeginTooltip();
+      ImGui::Text("%s (CLUT %d)", t.texName.c_str(), t.palette);
+      ImGui::Text("Size: %dx%d px", (int)std::round(tw), (int)std::round(th));
+      if (t.rotationSteps != 0) {
+        ImGui::Text("Rotation: %d°", t.rotationSteps * 90);
+      }
+      if (t.isPinned) {
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "★ Pinned (Right-click to unpin)");
+      } else {
+        ImGui::TextDisabled("Right-click to pin");
+      }
+      ImGui::EndTooltip();
     }
-    ImGui::SameLine();
+
     ImGui::PopID();
+  };
+
+  if (m_recentTiles.empty()) {
+    ImGui::TextDisabled("  (No recent tiles in cache)");
+  } else {
+    for (size_t i = 0; i < m_recentTiles.size(); ++i) {
+      if (i > 0 && (i % (size_t)cols) != 0) {
+        ImGui::SameLine(0.0f, 0.0f);
+      }
+      drawTileItem(i);
+    }
   }
+
   ImGui::EndChild();
+  ImGui::PopStyleVar(3);
 
   ImGui::End();
 }
