@@ -528,9 +528,14 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
   if (testTexture.GetTexture().id != 0) {
     ImGui::Text("Size: %d x %d", testTexture.GetWidth(),
                 testTexture.GetHeight());
-    if (testTexture.GetPalettes().size() > 1) {
-      if (ImGui::SliderInt("Palette", &currentPalette, 0,
-                           testTexture.GetPalettes().size() - 1)) {
+    // Palette selection & CLUT row controls (Option 2: Steppers + Combo with spanning color bars)
+    int numPalettes = (int)testTexture.GetPalettes().size();
+    if (numPalettes >= 1) {
+      auto applyNewPalette = [&](int newPal) {
+        if (numPalettes <= 0) return;
+        newPal = (newPal % numPalettes + numPalettes) % numPalettes;
+        if (newPal == currentPalette) return;
+        currentPalette = newPal;
         testTexture.ApplyPalette(currentPalette);
         if (activeFace) {
           RenderMesh snapBefore = *activeMesh;
@@ -547,6 +552,145 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
           localGeometryOverlay.RebuildChunkBatches(
               localGeometryOverlay.m_selectedChunk,
               fileManager.GetWorkspaceDir());
+        }
+      };
+
+      ImGui::Text("Palette:");
+      ImGui::SameLine();
+
+      float btnW = 22.0f;
+      float spacing = ImGui::GetStyle().ItemSpacing.x;
+      float comboW = ImGui::GetContentRegionAvail().x - (btnW * 2.0f + spacing * 2.0f);
+      if (comboW < 80.0f) comboW = 80.0f;
+
+      // Stepper: Previous [◀] (loops around if > 1 palette, disabled if only 1 palette)
+      bool canStep = (numPalettes > 1);
+      if (!canStep) ImGui::BeginDisabled();
+      if (ImGui::ArrowButton("##PrevPal", ImGuiDir_Left)) {
+        applyNewPalette(currentPalette - 1);
+      }
+      if (!canStep) ImGui::EndDisabled();
+
+      ImGui::SameLine();
+
+      // Dropdown Combo
+      ImGui::SetNextItemWidth(comboW);
+      std::string comboPreview = std::to_string(currentPalette);
+      if (!canStep) ImGui::BeginDisabled();
+      if (ImGui::BeginCombo("##PaletteCombo", comboPreview.c_str(), ImGuiComboFlags_HeightLarge)) {
+        for (int i = 0; i < numPalettes; ++i) {
+          ImGui::PushID(i);
+          bool isSelected = (currentPalette == i);
+          ImVec2 itemPos = ImGui::GetCursorScreenPos();
+          float itemH = 18.0f;
+          float itemW = ImGui::GetContentRegionAvail().x;
+
+          if (ImGui::Selectable("##PalItem", isSelected, 0, ImVec2(0, itemH))) {
+            applyNewPalette(i);
+          }
+          if (isSelected) {
+            ImGui::SetItemDefaultFocus();
+          }
+
+          // Draw enumerated label and CLUT color row across the dropdown option
+          ImDrawList* drawList = ImGui::GetWindowDrawList();
+          std::string numLabel = std::to_string(i);
+          float labelW = 24.0f;
+          drawList->AddText(ImVec2(itemPos.x + 4.0f, itemPos.y + 1.0f),
+                            isSelected ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 200, 200, 255),
+                            numLabel.c_str());
+
+          const auto& rowPal = testTexture.GetPalettes()[i];
+          if (!rowPal.colors.empty()) {
+            float barX = itemPos.x + labelW;
+            float barW = itemW - labelW - 4.0f;
+            float barH = itemH - 4.0f;
+            float barY = itemPos.y + 2.0f;
+            int numCols = (int)rowPal.colors.size();
+            float sW = barW / (float)numCols;
+
+            drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(20, 20, 20, 255));
+            for (int c = 0; c < numCols; ++c) {
+              const auto& col = rowPal.colors[c];
+              ImVec2 cp0(barX + c * sW, barY);
+              ImVec2 cp1(barX + (c + 1) * sW, barY + barH);
+              if (col.a == 0 && col.r == 0 && col.g == 0 && col.b == 0) {
+                drawList->AddRectFilled(cp0, cp1, IM_COL32(25, 25, 30, 255));
+                drawList->AddLine(cp0, cp1, IM_COL32(70, 70, 80, 255));
+              } else {
+                drawList->AddRectFilled(cp0, cp1, IM_COL32(col.r, col.g, col.b, 255));
+              }
+            }
+            drawList->AddRect(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(60, 60, 60, 255));
+          }
+
+          ImGui::PopID();
+        }
+        ImGui::EndCombo();
+      }
+      if (!canStep) ImGui::EndDisabled();
+
+      ImGui::SameLine();
+
+      // Stepper: Next [▶] (loops around if > 1 palette, disabled if only 1 palette)
+      if (!canStep) ImGui::BeginDisabled();
+      if (ImGui::ArrowButton("##NextPal", ImGuiDir_Right)) {
+        applyNewPalette(currentPalette + 1);
+      }
+      if (!canStep) ImGui::EndDisabled();
+    }
+
+    // 1-row colour preview for the selected CLUT / palette row
+    if (!testTexture.GetPalettes().empty()) {
+      int palIdx = std::clamp(currentPalette, 0, (int)testTexture.GetPalettes().size() - 1);
+      const auto& pal = testTexture.GetPalettes()[palIdx];
+      if (!pal.colors.empty()) {
+        float availWidth = ImGui::GetContentRegionAvail().x;
+        float barHeight = 16.0f;
+        ImVec2 barPos = ImGui::GetCursorScreenPos();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        ImGui::InvisibleButton("##PaletteColorPreview", ImVec2(availWidth, barHeight));
+        bool isHovered = ImGui::IsItemHovered();
+        ImVec2 mousePos = ImGui::GetMousePos();
+
+        int numColors = (int)pal.colors.size();
+        float swatchW = availWidth / (float)numColors;
+
+        int hoveredColorIdx = -1;
+        if (isHovered && mousePos.x >= barPos.x && mousePos.x < barPos.x + availWidth) {
+          hoveredColorIdx = std::clamp((int)((mousePos.x - barPos.x) / swatchW), 0, numColors - 1);
+        }
+
+        drawList->AddRectFilled(barPos, ImVec2(barPos.x + availWidth, barPos.y + barHeight), IM_COL32(20, 20, 20, 255));
+
+        for (int i = 0; i < numColors; ++i) {
+          const auto& c = pal.colors[i];
+          ImVec2 p0(barPos.x + i * swatchW, barPos.y);
+          ImVec2 p1(barPos.x + (i + 1) * swatchW, barPos.y + barHeight);
+
+          if (c.a == 0 && c.r == 0 && c.g == 0 && c.b == 0) {
+            drawList->AddRectFilled(p0, p1, IM_COL32(25, 25, 30, 255));
+            drawList->AddLine(p0, p1, IM_COL32(70, 70, 80, 255));
+          } else {
+            drawList->AddRectFilled(p0, p1, IM_COL32(c.r, c.g, c.b, 255));
+          }
+        }
+
+        drawList->AddRect(barPos, ImVec2(barPos.x + availWidth, barPos.y + barHeight), IM_COL32(80, 80, 80, 255));
+
+        if (hoveredColorIdx >= 0 && hoveredColorIdx < numColors) {
+          const auto& hc = pal.colors[hoveredColorIdx];
+          ImVec2 hp0(barPos.x + hoveredColorIdx * swatchW, barPos.y);
+          ImVec2 hp1(barPos.x + (hoveredColorIdx + 1) * swatchW, barPos.y + barHeight);
+          drawList->AddRect(hp0, hp1, IM_COL32(255, 255, 255, 255), 0.0f, 0, 2.0f);
+
+          ImGui::BeginTooltip();
+          ImGui::Text("Color #%d / %d", hoveredColorIdx, numColors);
+          ImGui::Text("RGB: (%d, %d, %d)", hc.r, hc.g, hc.b);
+          ImGui::Text("Hex: #%02X%02X%02X", hc.r, hc.g, hc.b);
+          if (hc.a == 0) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(Transparent STP)");
+          ImGui::EndTooltip();
         }
       }
     }
