@@ -6,11 +6,11 @@ bool TextureEditPanel::Draw(Textures& testTexture, RenderFace* activeFace, Rende
     bool uvsModified = false;
 
     float availWidth = ImGui::GetContentRegionAvail().x;
-    textureScale = availWidth / (float)testTexture.GetWidth();
+    textureScale = availWidth / 256.0f;
 
     ImVec2 imgPos = ImGui::GetCursorScreenPos();
-    float imgW = availWidth;
-    float imgH = testTexture.GetHeight() * textureScale;
+    float imgW = (float)testTexture.GetWidth() * textureScale;
+    float imgH = (float)testTexture.GetHeight() * textureScale;
 
     // Render the Raylib texture in ImGui
     ImGui::Image((ImTextureID)(intptr_t)testTexture.GetTexture().id, ImVec2(imgW, imgH));
