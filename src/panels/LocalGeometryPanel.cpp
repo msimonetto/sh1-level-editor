@@ -1,5 +1,5 @@
 #include "panels/LocalGeometryPanel.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "geometry/ChunkValidator.h"
 #include "geometry/SubdivideFace.h"

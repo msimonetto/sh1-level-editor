@@ -23,12 +23,12 @@
 #include "panels/OutlinerPanel.h"
 #include "panels/SettingsPanel.h"
 #include "panels/MenuPanel.h"
-#include "viewport/Collision.h"
-#include "viewport/GlobalGeometry.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/CollisionOverlay.h"
+#include "viewport/GlobalGeometryViewport.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "viewport/Viewport.h"
-#include "viewport/Sync.h"
-#include "viewport/Waypoints.h"
+#include "viewport/ViewportSync.h"
+#include "viewport/WaypointsOverlay.h"
 
 int main(int argc, char **argv) {
   // Initialize Raylib window

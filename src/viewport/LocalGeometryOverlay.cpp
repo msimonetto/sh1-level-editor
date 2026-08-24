@@ -1,4 +1,4 @@
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "geometry/ChunkValidator.h"
 #include "core/Config.h"
 #include "core/History.h"

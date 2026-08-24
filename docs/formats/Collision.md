@@ -2,7 +2,7 @@
 
 Map-level collision and physics data is optionally embedded within chunk `.IPD` files immediately following the main `IPD_FILE_HEADER` (at offset `0x54`), detected when `obj_name_offset - sizeof(IPD_FILE_HEADER) == 308`.
 
-C++ definitions are located in [`include/core/Structs.h`](../../include/core/Structs.h) and processed in [`include/viewport/Collision.h`](../../include/viewport/Collision.h) / [`src/viewport/Collision.cpp`](../../src/viewport/Collision.cpp).
+C++ definitions are located in [`include/core/Structs.h`](../../include/core/Structs.h) and processed in [`include/viewport/CollisionOverlay.h`](../../include/viewport/CollisionOverlay.h) / [`src/viewport/CollisionOverlay.cpp`](../../src/viewport/CollisionOverlay.cpp).
 
 ---
 
@@ -91,7 +91,7 @@ struct IPD_COLL_UNK3 {
 
 ## 2. Editor Reconstructed Characteristics
 
-As implemented in [`CollisionOverlay`](../../include/viewport/Collision.h) ([`src/viewport/Collision.cpp`](../../src/viewport/Collision.cpp)), collision data resolves into three primary visual representations:
+As implemented in [`CollisionOverlay`](../../include/viewport/CollisionOverlay.h) ([`src/viewport/CollisionOverlay.cpp`](../../src/viewport/CollisionOverlay.cpp)), collision data resolves into three primary visual representations:
 
 ### 1. Broadphase Terrain Meshes (`terrainBatches`)
 - **Grid Resolution:** Lookups across the `gridWidth` × `gridHeight` grid sample `ptr_block5` and `ptr_block6` for candidate `subcells`.

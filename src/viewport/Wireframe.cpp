@@ -1,5 +1,5 @@
 #include "viewport/Wireframe.h"
-#include "viewport/LocalGeometry.h"  // SelectedFace, SelectedVertex, EditMode
+#include "viewport/LocalGeometryOverlay.h"  // SelectedFace, SelectedVertex, EditMode
 #include "raymath.h"
 #include "rlgl.h"
 

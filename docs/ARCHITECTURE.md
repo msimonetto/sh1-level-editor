@@ -285,27 +285,27 @@ The unified visual geometry renderer and host for viewport overlays.
   - Dispatches rendering and picking events to registered overlays based on `m_activeMode`.
   - Rebuilds GPU batches incrementally on geometry changes via `RebuildChunkBatches()`.
 
-### `Scene.h`
+### `SceneOverlay.h`
 - **`SceneOverlay`**: Standard read-only scene layout viewer.
 
-### `Collision.h`
+### `CollisionOverlay.h`
 - **`CollisionOverlay`**: Visualizes walkable 2.5D floor terrain, sloped surfaces, and vertical wall occlusion planes parsed from `.IPD` collision headers.
 
 ### `Frustum.h`
 - **`Frustum`**: Extracts camera view frustum planes (`FromCamera()`) and performs fast sphere/box culling to optimize rendering of large multi-chunk scenes.
 
-### `GlobalGeometry.h`
+### `GlobalGeometryViewport.h`
 - **`GlobalGeometryViewport`**: Standalone 3D viewport for browsing and inspecting global `_GLB.PLM` props with isolated camera controls.
 
-### `LocalGeometry.h`
+### `LocalGeometryOverlay.h`
 - **`EditMode`**: Enum (`GlobalObject`, `Mesh`, `Face`, `Vertex`).
 - **`SelectedVertex`**, **`SelectedFace`**: Structures tracking multiselect items with selection order.
 - **`LocalGeometryOverlay`**: The central interactive 3D editing layer. Handles raycast picking, box selection, transform gizmo manipulation, vertex/face highlighting, and wireframe overlays.
 
-### `Sync.h`
+### `ViewportSync.h`
 - **`ViewportSync`**: Coordinates asynchronous background chunk loading and synchronizes loaded state between `FileManager`, `Viewport`, and `LocalGeometryOverlay`.
 
-### `Waypoints.h`
+### `WaypointsOverlay.h`
 - **`WaypointsOverlay`**: Renders 3D waypoint pins, orientation arrows, color-coded door trigger volumes, and spline curves linking connected rooms.
 
 ### `Wireframe.h`

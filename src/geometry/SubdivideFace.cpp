@@ -1,5 +1,5 @@
 #include "geometry/SubdivideFace.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "formats/IPDWrite.h"
 #include "raymath.h"

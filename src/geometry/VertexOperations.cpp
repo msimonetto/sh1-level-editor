@@ -1,6 +1,6 @@
 #include "geometry/VertexOperations.h"
 #include "geometry/MeshOperations.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "formats/IPDWrite.h"
 #include "raymath.h"

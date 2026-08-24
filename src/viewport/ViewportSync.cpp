@@ -2,11 +2,11 @@
 #include "formats/IPDParse.h"
 #include "formats/OverlayLoader.h"
 #include "core/Textures.h"
-#include "viewport/Collision.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/CollisionOverlay.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "viewport/Viewport.h"
-#include "viewport/Sync.h"
-#include "viewport/Waypoints.h"
+#include "viewport/ViewportSync.h"
+#include "viewport/WaypointsOverlay.h"
 #include <algorithm>
 #include <cstdio>
 #include <memory>

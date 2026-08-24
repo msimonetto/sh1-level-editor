@@ -1,7 +1,7 @@
 #pragma once
 #include "core/History.h"
 #include "imgui.h"
-#include "viewport/Waypoints.h"
+#include "viewport/WaypointsOverlay.h"
 
 
 static const char *ALL_MAP_KEYS[] = {

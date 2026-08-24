@@ -1,5 +1,5 @@
 #include "geometry/GlobalObjectOperations.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "formats/IPDParse.h"
 #include "formats/IPDWrite.h"

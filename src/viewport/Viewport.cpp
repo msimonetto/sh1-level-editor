@@ -1,6 +1,6 @@
 #include "viewport/Viewport.h"
-#include "viewport/Collision.h"
-#include "viewport/Waypoints.h"
+#include "viewport/CollisionOverlay.h"
+#include "viewport/WaypointsOverlay.h"
 #include "core/Config.h"
 #include "core/Textures.h"
 #include "formats/IPDParse.h"

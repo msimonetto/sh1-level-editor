@@ -1,4 +1,4 @@
-#include "viewport/Waypoints.h"
+#include "viewport/WaypointsOverlay.h"
 #include "imgui.h"
 #include "core/Config.h"
 #include "raymath.h"

@@ -1,11 +1,11 @@
 #include "panels/ViewportToolsPanel.h"
 #include "imgui.h"
 #include "extras/IconsFontAwesome6.h"
-#include "viewport/Collision.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/CollisionOverlay.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "viewport/Viewport.h"
 #include "viewport/ViewportBase.h"
-#include "viewport/Waypoints.h"
+#include "viewport/WaypointsOverlay.h"
 
 ViewportToolsPanel::ViewportToolsPanel() {}
 

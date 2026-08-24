@@ -1,7 +1,7 @@
 #include "panels/OutlinerPanel.h"
 #include "imgui.h"
 #include "viewport/Viewport.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "extras/IconsFontAwesome6.h"
 #include <cstdio>
 

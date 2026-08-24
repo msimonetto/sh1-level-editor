@@ -3,7 +3,7 @@
 #include "raylib.h"
 #include "rlgl.h"
 #include "viewport/ViewportBase.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include "panels/ViewportToolsPanel.h"
 #include <string>
 #include <vector>

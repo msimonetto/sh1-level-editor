@@ -1,7 +1,7 @@
 #pragma once
 #include "raylib.h"
 #include "formats/IPDParse.h"
-#include "viewport/LocalGeometry.h"
+#include "viewport/LocalGeometryOverlay.h"
 #include <vector>
 #include <set>
 #include <string>

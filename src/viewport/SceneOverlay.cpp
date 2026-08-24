@@ -1,4 +1,4 @@
-#include "viewport/Scene.h"
+#include "viewport/SceneOverlay.h"
 #include "formats/IPDParse.h"
 #include "core/Textures.h"
 #include "raymath.h"

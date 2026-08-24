@@ -5,8 +5,8 @@
 #include "formats/Structs.h"
 #include "imgui.h"
 #include "raylib.h"
-#include "viewport/LocalGeometry.h"
-#include "viewport/Scene.h"
+#include "viewport/LocalGeometryOverlay.h"
+#include "viewport/SceneOverlay.h"
 #include "panels/TextureEditPanel.h"
 #include <deque>
 #include <set>

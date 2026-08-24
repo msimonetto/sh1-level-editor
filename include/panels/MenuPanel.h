@@ -4,8 +4,8 @@
 #include "core/FileManager.h"
 #include "viewport/Viewport.h"
 #include "core/History.h"
-#include "viewport/LocalGeometry.h"
-#include "viewport/Waypoints.h"
+#include "viewport/LocalGeometryOverlay.h"
+#include "viewport/WaypointsOverlay.h"
 #include "panels/SettingsPanel.h"
 
 namespace MenuPanel {

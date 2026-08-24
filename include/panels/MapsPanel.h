@@ -1,6 +1,6 @@
 #pragma once
 #include "core/MapTable.h"
-#include "viewport/Waypoints.h"
+#include "viewport/WaypointsOverlay.h"
 #include <string>
 
 class WaypointsOverlay;
