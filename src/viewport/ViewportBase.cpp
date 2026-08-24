@@ -429,15 +429,25 @@ void ViewportBase::DrawViewportCanvas(int w, int h) {
   bool doBoxPicking = false;
   Rectangle finalBox = {0};
 
+  Vector2 pickPos = m_localMousePos;
   if (m_hovered) {
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_boxSelectStart = m_localMousePos;
-        if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) {
+        bool isMultiselectHeld = IsKeyDown(Config::Get().KeyMultiselect) ||
+                                 ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift) ||
+                                 ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl) ||
+                                 ImGui::GetIO().KeyShift || ImGui::GetIO().KeyCtrl;
+        if (isMultiselectHeld) {
           m_isBoxSelecting = true;
+        } else {
+          doPicking = true;
+          pickPos = m_localMousePos;
         }
+      } else {
+        doPicking = true;
+        pickPos = m_localMousePos;
       }
-      doPicking = true;
     }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
       if (m_isBoxSelecting) {
@@ -451,6 +461,9 @@ void ViewportBase::DrawViewportCanvas(int w, int h) {
         if (maxX - minX > 5.0f || maxY - minY > 5.0f) {
           doBoxPicking = true;
           finalBox = {minX, minY, maxX - minX, maxY - minY};
+        } else {
+          doPicking = true;
+          pickPos = m_boxSelectStart;
         }
       }
     }
@@ -504,7 +517,7 @@ void ViewportBase::DrawViewportCanvas(int w, int h) {
   }
   if (doPicking) {
     Ray ray =
-        GetScreenToWorldRayEx(m_localMousePos, m_camera, m_rtWidth, m_rtHeight);
+        GetScreenToWorldRayEx(pickPos, m_camera, m_rtWidth, m_rtHeight);
     HandlePicking(ray);
   }
   if (doBoxPicking) {

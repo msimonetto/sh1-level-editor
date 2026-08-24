@@ -102,7 +102,7 @@ See [`TODO.md`](tasks/FullEditor/TODO.md) and [`Suggested Improvements.md`](task
 ### Medium Priority
 - [ ] **Expand/Collapse All**: Add bulk expand/collapse controls to the Scene Outliner hierarchy tree.
 - [ ] **Reset UV Context Action**: Add a "Reset to Default Planar UV" entry to the viewport right-click context menu.
-- [ ] **Multiselect Refinement**: Support Shift-click range selection and Box Drag selection across Face and Vertex modes.
+- [x] **Multiselect Refinement**: Support Shift-click range selection and Box Drag selection across Face and Vertex modes.
 - [ ] **Auto-generate Project Folders**: Add a "Generate Workspace Folders" button in `SettingsPanel` to pre-populate missing subdirectories on initial setup.
 
 ---

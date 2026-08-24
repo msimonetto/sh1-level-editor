@@ -30,6 +30,72 @@ static Vector3 GetDominantAxis(Vector3 v) {
   return {0.0f, 0.0f, v.z > 0 ? 1.0f : -1.0f};
 }
 
+// Check if 2D line segment (p1, p2) intersects with AABB rectangle
+static inline bool SegmentIntersectsBox2D(Vector2 p1, Vector2 p2, Rectangle box) {
+  float bx0 = box.x;
+  float bx1 = box.x + box.width;
+  float by0 = box.y;
+  float by1 = box.y + box.height;
+
+  // Quick bounding box rejection
+  float segMinX = std::min(p1.x, p2.x);
+  float segMaxX = std::max(p1.x, p2.x);
+  float segMinY = std::min(p1.y, p2.y);
+  float segMaxY = std::max(p1.y, p2.y);
+
+  if (segMaxX < bx0 || segMinX > bx1 || segMaxY < by0 || segMinY > by1)
+    return false;
+
+  // If either endpoint is inside the box
+  if ((p1.x >= bx0 && p1.x <= bx1 && p1.y >= by0 && p1.y <= by1) ||
+      (p2.x >= bx0 && p2.x <= bx1 && p2.y >= by0 && p2.y <= by1))
+    return true;
+
+  // Parametric intersection with the 4 box edge lines
+  float dx = p2.x - p1.x;
+  float dy = p2.y - p1.y;
+
+  if (fabsf(dx) > 1e-6f) {
+    float t = (bx0 - p1.x) / dx;
+    if (t >= 0.0f && t <= 1.0f) {
+      float y = p1.y + t * dy;
+      if (y >= by0 && y <= by1) return true;
+    }
+    t = (bx1 - p1.x) / dx;
+    if (t >= 0.0f && t <= 1.0f) {
+      float y = p1.y + t * dy;
+      if (y >= by0 && y <= by1) return true;
+    }
+  }
+
+  if (fabsf(dy) > 1e-6f) {
+    float t = (by0 - p1.y) / dy;
+    if (t >= 0.0f && t <= 1.0f) {
+      float x = p1.x + t * dx;
+      if (x >= bx0 && x <= bx1) return true;
+    }
+    t = (by1 - p1.y) / dy;
+    if (t >= 0.0f && t <= 1.0f) {
+      float x = p1.x + t * dx;
+      if (x >= bx0 && x <= bx1) return true;
+    }
+  }
+
+  return false;
+}
+
+// Check if 2D point is inside a triangle
+static inline bool PointInTriangle2D(Vector2 p, Vector2 a, Vector2 b, Vector2 c) {
+  float cross1 = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  float cross2 = (c.x - b.x) * (p.y - b.y) - (c.y - b.y) * (p.x - b.x);
+  float cross3 = (a.x - c.x) * (p.y - c.y) - (a.y - c.y) * (p.x - c.x);
+
+  bool hasNeg = (cross1 < 0.0f) || (cross2 < 0.0f) || (cross3 < 0.0f);
+  bool hasPos = (cross1 > 0.0f) || (cross2 > 0.0f) || (cross3 > 0.0f);
+
+  return !(hasNeg && hasPos);
+}
+
 // ---------------------------------------------------------------------------
 // Construction / destruction
 // ---------------------------------------------------------------------------
@@ -567,11 +633,13 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
 
     ImGuiIO &io = ImGui::GetIO();
     bool isRightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+    bool isMultiselect = io.KeyShift || io.KeyCtrl || IsKeyDown(Config::Get().KeyMultiselect);
 
     if (bestVertexIdx >= 0) {
       m_selectedChunk = bestChunk;
       m_selectedObjectIdx = bestObjIdx;
       m_selectedMeshIdx = bestMeshIdx;
+      m_selectedVertexIdx = bestVertexIdx;
 
       SelectedVertex v = {bestChunk, bestObjIdx, bestMeshIdx, bestVertexIdx};
       bool alreadySelected = m_selectedVertices.find(v) != m_selectedVertices.end();
@@ -579,20 +647,21 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
       if (isRightClick && alreadySelected) {
           // Keep selection group intact
       } else {
-          if (!io.KeyShift) m_selectedVertices.clear();
+          if (!isMultiselect) m_selectedVertices.clear();
 
-          if (io.KeyShift && alreadySelected && !isRightClick) {
+          if (isMultiselect && alreadySelected && !isRightClick) {
             m_selectedVertices.erase(v);
           } else {
             m_selectedVertices.insert(v);
           }
       }
     } else {
-      if (!io.KeyShift) {
+      if (!isMultiselect) {
         m_selectedChunk = "";
         m_selectedVertices.clear();
         m_selectedMeshIdx = -1;
         m_selectedObjectIdx = -1;
+        m_selectedVertexIdx = -1;
       }
     }
     return;
@@ -600,6 +669,7 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
 
   ImGuiIO &io = ImGui::GetIO();
   bool isRightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+  bool isMultiselect = io.KeyCtrl || io.KeyShift || IsKeyDown(Config::Get().KeyMultiselect);
 
   if (hitFaceIdx >= 0) {
     m_selectedChunk = hitChunk;
@@ -613,9 +683,9 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
     if (isRightClick && alreadySelected) {
         // Keep selection group intact
     } else {
-        if (!io.KeyCtrl && !io.KeyShift) m_selectedFaces.clear();
+        if (!isMultiselect) m_selectedFaces.clear();
 
-        if (io.KeyCtrl && alreadySelected && !isRightClick) {
+        if (isMultiselect && alreadySelected && !isRightClick) {
           m_selectedFaces.erase(f);
         } else {
           m_selectedFaces.insert(f);
@@ -626,7 +696,7 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
     m_selectedObjectIdx = hitObjIdx;
     m_selectedMeshIdx = hitMeshIdx;
     m_selectedFaceIdx = hitFaceIdx;
-  } else if (!io.KeyCtrl && !io.KeyShift) {
+  } else if (!isMultiselect) {
     m_selectedChunk = "";
     m_selectedObjectIdx = -1;
     m_selectedMeshIdx = -1;
@@ -636,144 +706,381 @@ void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
 }
 
 void LocalGeometryOverlay::HandleBoxPicking(Viewport &vp, Rectangle box) {
-  if (m_editMode != EditMode::Vertex)
+  if (m_editMode != EditMode::Vertex && m_editMode != EditMode::Face)
     return;
 
   if (box.width < 1.0f || box.height < 1.0f)
     return;
 
   ImGuiIO &io = ImGui::GetIO();
-  if (!io.KeyShift) {
-    m_selectedVertices.clear();
-  }
+  bool isMultiselect = io.KeyCtrl || io.KeyShift || IsKeyDown(Config::Get().KeyMultiselect);
 
   Vector3 camPos = vp.GetCamera().position;
   Vector3 forward = Vector3Normalize({vp.GetCamera().target.x - vp.GetCamera().position.x,
                                       vp.GetCamera().target.y - vp.GetCamera().position.y,
                                       vp.GetCamera().target.z - vp.GetCamera().position.z});
 
-  struct CandidateVertex {
-    Vector3 pos;
-    float dist;
-    Ray ray;
-    const std::string *chunkName;
-    int objIdx;
-    int meshIdx;
-    int vIdx;
-    bool occluded;
-  };
+  if (m_editMode == EditMode::Vertex) {
+    if (!isMultiselect) {
+      m_selectedVertices.clear();
+    }
 
-  std::vector<CandidateVertex> candidates;
-  BoundingBox raysAABB;
-  raysAABB.min = camPos;
-  raysAABB.max = camPos;
+    struct CandidateVertex {
+      Vector3 pos;
+      float dist;
+      Ray ray;
+      const std::string *chunkName;
+      int objIdx;
+      int meshIdx;
+      int vIdx;
+      bool occluded;
+    };
 
-  for (const auto &lc : GetChunks()) {
-    if (!lc.visible || lc.hasError)
-      continue;
+    std::vector<CandidateVertex> candidates;
+    BoundingBox raysAABB;
+    raysAABB.min = camPos;
+    raysAABB.max = camPos;
 
-    for (size_t objIdx = 0; objIdx < lc.data->objects.size(); ++objIdx) {
-      const auto &obj = lc.data->objects[objIdx];
-      if (obj.bounds.min.x > obj.bounds.max.x)
-        continue;
-      if (obj.isGlobal)
+    for (const auto &lc : GetChunks()) {
+      if (!lc.visible || lc.hasError)
         continue;
 
-      for (size_t meshIdx = 0; meshIdx < obj.meshes.size(); ++meshIdx) {
-        const auto &mesh = obj.meshes[meshIdx];
+      for (size_t objIdx = 0; objIdx < lc.data->objects.size(); ++objIdx) {
+        const auto &obj = lc.data->objects[objIdx];
+        if (obj.bounds.min.x > obj.bounds.max.x)
+          continue;
+        if (obj.isGlobal)
+          continue;
 
-        for (size_t vIdx = 0; vIdx < mesh.vx.size(); ++vIdx) {
-          Vector3 v = {mesh.vx[vIdx], mesh.vy[vIdx], mesh.vz[vIdx]};
+        for (size_t meshIdx = 0; meshIdx < obj.meshes.size(); ++meshIdx) {
+          const auto &mesh = obj.meshes[meshIdx];
 
-          Vector3 toV = {v.x - camPos.x, v.y - camPos.y, v.z - camPos.z};
-          if (Vector3DotProduct(forward, toV) < 0.1f)
-            continue;
+          for (size_t vIdx = 0; vIdx < mesh.vx.size(); ++vIdx) {
+            Vector3 v = {mesh.vx[vIdx], mesh.vy[vIdx], mesh.vz[vIdx]};
 
-          Vector2 screenPos =
-              GetWorldToScreenEx(v, vp.GetCamera(), vp.GetWidth(), vp.GetHeight());
-          if (screenPos.x >= box.x && screenPos.x <= box.x + box.width &&
-              screenPos.y >= box.y && screenPos.y <= box.y + box.height) {
-            CandidateVertex cand;
-            cand.pos = v;
-            cand.dist = Vector3Length(toV);
-            cand.ray = {camPos, Vector3Normalize(toV)};
-            cand.chunkName = &lc.data->chunkName;
-            cand.objIdx = (int)objIdx;
-            cand.meshIdx = (int)meshIdx;
-            cand.vIdx = (int)vIdx;
-            cand.occluded = false;
-            candidates.push_back(cand);
+            Vector3 toV = {v.x - camPos.x, v.y - camPos.y, v.z - camPos.z};
+            if (Vector3DotProduct(forward, toV) < 0.1f)
+              continue;
 
-            raysAABB.min = Vector3Min(raysAABB.min, v);
-            raysAABB.max = Vector3Max(raysAABB.max, v);
+            Vector2 screenPos =
+                GetWorldToScreenEx(v, vp.GetCamera(), vp.GetWidth(), vp.GetHeight());
+            if (screenPos.x >= box.x && screenPos.x <= box.x + box.width &&
+                screenPos.y >= box.y && screenPos.y <= box.y + box.height) {
+              CandidateVertex cand;
+              cand.pos = v;
+              cand.dist = Vector3Length(toV);
+              cand.ray = {camPos, Vector3Normalize(toV)};
+              cand.chunkName = &lc.data->chunkName;
+              cand.objIdx = (int)objIdx;
+              cand.meshIdx = (int)meshIdx;
+              cand.vIdx = (int)vIdx;
+              cand.occluded = false;
+              candidates.push_back(cand);
+
+              raysAABB.min = Vector3Min(raysAABB.min, v);
+              raysAABB.max = Vector3Max(raysAABB.max, v);
+            }
           }
         }
       }
     }
-  }
 
-  if (candidates.empty())
-    return;
+    if (candidates.empty())
+      return;
 
-  for (const auto &olc : GetChunks()) {
-    if (!olc.visible || olc.hasError)
-      continue;
-    for (const auto &oobj : olc.data->objects) {
-      if (oobj.bounds.min.x > oobj.bounds.max.x)
+    for (const auto &olc : GetChunks()) {
+      if (!olc.visible || olc.hasError)
         continue;
-
-      if (!CheckCollisionBoxes(oobj.bounds, raysAABB))
-        continue;
-
-      std::vector<CandidateVertex *> hitsThisObject;
-      for (auto &cand : candidates) {
-        if (cand.occluded)
+      for (const auto &oobj : olc.data->objects) {
+        if (oobj.bounds.min.x > oobj.bounds.max.x)
           continue;
-        RayCollision boxHit = GetRayCollisionBox(cand.ray, oobj.bounds);
-        if (boxHit.hit && boxHit.distance < cand.dist) {
-          hitsThisObject.push_back(&cand);
+
+        if (!CheckCollisionBoxes(oobj.bounds, raysAABB))
+          continue;
+
+        std::vector<CandidateVertex *> hitsThisObject;
+        for (auto &cand : candidates) {
+          if (cand.occluded)
+            continue;
+          RayCollision boxHit = GetRayCollisionBox(cand.ray, oobj.bounds);
+          if (boxHit.hit && boxHit.distance < cand.dist) {
+            hitsThisObject.push_back(&cand);
+          }
         }
-      }
-      if (hitsThisObject.empty())
-        continue;
+        if (hitsThisObject.empty())
+          continue;
 
-      for (const auto &omesh : oobj.meshes) {
-        for (const auto &oface : omesh.faces) {
-          bool isQuad = (oface.v[3] != 0xFF);
-          int triCount = isQuad ? 2 : 1;
-          static const int triV[2][3] = {{0, 1, 2}, {0, 2, 3}};
+        for (const auto &omesh : oobj.meshes) {
+          for (const auto &oface : omesh.faces) {
+            bool isQuad = (oface.v[3] != 0xFF);
+            int triCount = isQuad ? 2 : 1;
+            static const int triV[2][3] = {{0, 1, 2}, {0, 2, 3}};
 
-          for (int t = 0; t < triCount; ++t) {
-            Vector3 v1 = {omesh.vx[oface.v[triV[t][0]]],
-                          omesh.vy[oface.v[triV[t][0]]],
-                          omesh.vz[oface.v[triV[t][0]]]};
-            Vector3 v2 = {omesh.vx[oface.v[triV[t][1]]],
-                          omesh.vy[oface.v[triV[t][1]]],
-                          omesh.vz[oface.v[triV[t][1]]]};
-            Vector3 v3 = {omesh.vx[oface.v[triV[t][2]]],
-                          omesh.vy[oface.v[triV[t][2]]],
-                          omesh.vz[oface.v[triV[t][2]]]};
+            for (int t = 0; t < triCount; ++t) {
+              Vector3 v1 = {omesh.vx[oface.v[triV[t][0]]],
+                            omesh.vy[oface.v[triV[t][0]]],
+                            omesh.vz[oface.v[triV[t][0]]]};
+              Vector3 v2 = {omesh.vx[oface.v[triV[t][1]]],
+                            omesh.vy[oface.v[triV[t][1]]],
+                            omesh.vz[oface.v[triV[t][1]]]};
+              Vector3 v3 = {omesh.vx[oface.v[triV[t][2]]],
+                            omesh.vy[oface.v[triV[t][2]]],
+                            omesh.vz[oface.v[triV[t][2]]]};
 
-            for (auto *cand : hitsThisObject) {
-              if (cand->occluded)
-                continue;
-              RayCollision triHit =
-                  GetRayCollisionTriangle(cand->ray, v1, v2, v3);
-              if (triHit.hit &&
-                  triHit.distance < cand->dist - 0.5f) {
-                cand->occluded = true;
+              for (auto *cand : hitsThisObject) {
+                if (cand->occluded)
+                  continue;
+                RayCollision triHit =
+                    GetRayCollisionTriangle(cand->ray, v1, v2, v3);
+                if (triHit.hit &&
+                    triHit.distance < cand->dist - 0.5f) {
+                  cand->occluded = true;
+                }
               }
             }
           }
         }
       }
     }
-  }
 
-  for (const auto &cand : candidates) {
-    if (!cand.occluded) {
-      m_selectedVertices.insert(
-          {*cand.chunkName, cand.objIdx, cand.meshIdx, cand.vIdx});
+    bool anyAdded = false;
+    for (const auto &cand : candidates) {
+      if (!cand.occluded) {
+        m_selectedVertices.insert(
+            {*cand.chunkName, cand.objIdx, cand.meshIdx, cand.vIdx});
+        if (!anyAdded) {
+          m_selectedChunk = *cand.chunkName;
+          m_selectedObjectIdx = cand.objIdx;
+          m_selectedMeshIdx = cand.meshIdx;
+          m_selectedVertexIdx = cand.vIdx;
+          anyAdded = true;
+        }
+      }
+    }
+  } else if (m_editMode == EditMode::Face) {
+    if (!isMultiselect) {
+      m_selectedFaces.clear();
+    }
+
+    struct CandidateFace {
+      Vector3 center;
+      Vector3 samplePoints[5];
+      int sampleCount;
+      float dist;
+      Ray ray;
+      const std::string *chunkName;
+      int objIdx;
+      int meshIdx;
+      int faceIdx;
+      bool occluded;
+    };
+
+    std::vector<CandidateFace> candidates;
+    BoundingBox raysAABB;
+    raysAABB.min = camPos;
+    raysAABB.max = camPos;
+
+    for (const auto &lc : GetChunks()) {
+      if (!lc.visible || lc.hasError)
+        continue;
+
+      for (size_t objIdx = 0; objIdx < lc.data->objects.size(); ++objIdx) {
+        const auto &obj = lc.data->objects[objIdx];
+        if (obj.bounds.min.x > obj.bounds.max.x)
+          continue;
+        if (obj.isGlobal)
+          continue;
+
+        for (size_t meshIdx = 0; meshIdx < obj.meshes.size(); ++meshIdx) {
+          const auto &mesh = obj.meshes[meshIdx];
+
+          for (size_t fi = 0; fi < mesh.faces.size(); ++fi) {
+            const auto &face = mesh.faces[fi];
+            bool isQuad = (face.v[3] != 0xFF);
+
+            Vector3 v0 = {mesh.vx[face.v[0]], mesh.vy[face.v[0]], mesh.vz[face.v[0]]};
+            Vector3 v1 = {mesh.vx[face.v[1]], mesh.vy[face.v[1]], mesh.vz[face.v[1]]};
+            Vector3 v2 = {mesh.vx[face.v[2]], mesh.vy[face.v[2]], mesh.vz[face.v[2]]};
+            Vector3 v3 = isQuad ? Vector3{mesh.vx[face.v[3]], mesh.vy[face.v[3]], mesh.vz[face.v[3]]} : Vector3{0.0f, 0.0f, 0.0f};
+
+            Vector3 faceCenter;
+            if (isQuad) {
+              faceCenter = {(v0.x + v1.x + v2.x + v3.x) * 0.25f,
+                            (v0.y + v1.y + v2.y + v3.y) * 0.25f,
+                            (v0.z + v1.z + v2.z + v3.z) * 0.25f};
+            } else {
+              faceCenter = {(v0.x + v1.x + v2.x) / 3.0f,
+                            (v0.y + v1.y + v2.y) / 3.0f,
+                            (v0.z + v1.z + v2.z) / 3.0f};
+            }
+
+            Vector3 toCenter = {faceCenter.x - camPos.x, faceCenter.y - camPos.y, faceCenter.z - camPos.z};
+            Vector3 toV0 = {v0.x - camPos.x, v0.y - camPos.y, v0.z - camPos.z};
+            Vector3 toV1 = {v1.x - camPos.x, v1.y - camPos.y, v1.z - camPos.z};
+            Vector3 toV2 = {v2.x - camPos.x, v2.y - camPos.y, v2.z - camPos.z};
+            Vector3 toV3 = isQuad ? Vector3{v3.x - camPos.x, v3.y - camPos.y, v3.z - camPos.z} : Vector3{0.0f, 0.0f, 0.0f};
+
+            // Face must be strictly in front of the camera plane
+            if (Vector3DotProduct(forward, toCenter) < 0.1f ||
+                Vector3DotProduct(forward, toV0) < 0.1f ||
+                Vector3DotProduct(forward, toV1) < 0.1f ||
+                Vector3DotProduct(forward, toV2) < 0.1f ||
+                (isQuad && Vector3DotProduct(forward, toV3) < 0.1f)) {
+              continue;
+            }
+
+            Vector2 s0 = GetWorldToScreenEx(v0, vp.GetCamera(), vp.GetWidth(), vp.GetHeight());
+            Vector2 s1 = GetWorldToScreenEx(v1, vp.GetCamera(), vp.GetWidth(), vp.GetHeight());
+            Vector2 s2 = GetWorldToScreenEx(v2, vp.GetCamera(), vp.GetWidth(), vp.GetHeight());
+            Vector2 s3 = isQuad ? GetWorldToScreenEx(v3, vp.GetCamera(), vp.GetWidth(), vp.GetHeight()) : Vector2{0.0f, 0.0f};
+            Vector2 sCenter = GetWorldToScreenEx(faceCenter, vp.GetCamera(), vp.GetWidth(), vp.GetHeight());
+
+            bool hit = false;
+
+            // 1. Centroid inside selection box
+            if (sCenter.x >= box.x && sCenter.x <= box.x + box.width &&
+                sCenter.y >= box.y && sCenter.y <= box.y + box.height) {
+              hit = true;
+            }
+
+            // 2. Any edge crosses selection box (or any vertex inside box)
+            if (!hit) {
+              if (SegmentIntersectsBox2D(s0, s1, box) ||
+                  SegmentIntersectsBox2D(s1, s2, box) ||
+                  (isQuad ? (SegmentIntersectsBox2D(s2, s3, box) || SegmentIntersectsBox2D(s3, s0, box))
+                          : SegmentIntersectsBox2D(s2, s0, box))) {
+                hit = true;
+              }
+            }
+
+            // 3. Selection box center inside face
+            if (!hit) {
+              Vector2 boxCenter = {box.x + box.width * 0.5f, box.y + box.height * 0.5f};
+              if (PointInTriangle2D(boxCenter, s0, s1, s2) ||
+                  (isQuad && PointInTriangle2D(boxCenter, s0, s2, s3))) {
+                hit = true;
+              }
+            }
+
+            if (hit) {
+              CandidateFace cand;
+              cand.center = faceCenter;
+              cand.samplePoints[0] = faceCenter;
+              cand.samplePoints[1] = v0;
+              cand.samplePoints[2] = v1;
+              cand.samplePoints[3] = v2;
+              cand.sampleCount = 4;
+              if (isQuad) {
+                cand.samplePoints[4] = v3;
+                cand.sampleCount = 5;
+              }
+              cand.dist = Vector3Length(toCenter);
+              cand.ray = {camPos, Vector3Normalize(toCenter)};
+              cand.chunkName = &lc.data->chunkName;
+              cand.objIdx = (int)objIdx;
+              cand.meshIdx = (int)meshIdx;
+              cand.faceIdx = (int)fi;
+              cand.occluded = false;
+              candidates.push_back(cand);
+
+              raysAABB.min = Vector3Min(raysAABB.min, faceCenter);
+              raysAABB.max = Vector3Max(raysAABB.max, faceCenter);
+              raysAABB.min = Vector3Min(raysAABB.min, v0);
+              raysAABB.max = Vector3Max(raysAABB.max, v0);
+              raysAABB.min = Vector3Min(raysAABB.min, v1);
+              raysAABB.max = Vector3Max(raysAABB.max, v1);
+              raysAABB.min = Vector3Min(raysAABB.min, v2);
+              raysAABB.max = Vector3Max(raysAABB.max, v2);
+              if (isQuad) {
+                raysAABB.min = Vector3Min(raysAABB.min, v3);
+                raysAABB.max = Vector3Max(raysAABB.max, v3);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (candidates.empty())
+      return;
+
+    for (const auto &olc : GetChunks()) {
+      if (!olc.visible || olc.hasError)
+        continue;
+      for (size_t oobjIdx = 0; oobjIdx < olc.data->objects.size(); ++oobjIdx) {
+        const auto &oobj = olc.data->objects[oobjIdx];
+        if (oobj.bounds.min.x > oobj.bounds.max.x)
+          continue;
+
+        if (!CheckCollisionBoxes(oobj.bounds, raysAABB))
+          continue;
+
+        std::vector<CandidateFace *> hitsThisObject;
+        for (auto &cand : candidates) {
+          if (cand.occluded)
+            continue;
+          RayCollision boxHit = GetRayCollisionBox(cand.ray, oobj.bounds);
+          if (boxHit.hit && boxHit.distance < cand.dist) {
+            hitsThisObject.push_back(&cand);
+          }
+        }
+        if (hitsThisObject.empty())
+          continue;
+
+        for (size_t omeshIdx = 0; omeshIdx < oobj.meshes.size(); ++omeshIdx) {
+          const auto &omesh = oobj.meshes[omeshIdx];
+          for (size_t ofaceIdx = 0; ofaceIdx < omesh.faces.size(); ++ofaceIdx) {
+            const auto &oface = omesh.faces[ofaceIdx];
+            bool isQuad = (oface.v[3] != 0xFF);
+            int triCount = isQuad ? 2 : 1;
+            static const int triV[2][3] = {{0, 1, 2}, {0, 2, 3}};
+
+            for (int t = 0; t < triCount; ++t) {
+              Vector3 v1 = {omesh.vx[oface.v[triV[t][0]]],
+                            omesh.vy[oface.v[triV[t][0]]],
+                            omesh.vz[oface.v[triV[t][0]]]};
+              Vector3 v2 = {omesh.vx[oface.v[triV[t][1]]],
+                            omesh.vy[oface.v[triV[t][1]]],
+                            omesh.vz[oface.v[triV[t][1]]]};
+              Vector3 v3 = {omesh.vx[oface.v[triV[t][2]]],
+                            omesh.vy[oface.v[triV[t][2]]],
+                            omesh.vz[oface.v[triV[t][2]]]};
+
+              for (auto *cand : hitsThisObject) {
+                if (cand->occluded)
+                  continue;
+                if (*cand->chunkName == olc.data->chunkName &&
+                    cand->objIdx == (int)oobjIdx &&
+                    cand->meshIdx == (int)omeshIdx &&
+                    cand->faceIdx == (int)ofaceIdx) {
+                  continue;
+                }
+                RayCollision triHit =
+                    GetRayCollisionTriangle(cand->ray, v1, v2, v3);
+                if (triHit.hit &&
+                    triHit.distance < cand->dist - 0.5f) {
+                  cand->occluded = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    bool anyAdded = false;
+    for (const auto &cand : candidates) {
+      if (!cand.occluded) {
+        m_selectedFaces.insert(
+            {*cand.chunkName, cand.objIdx, cand.meshIdx, cand.faceIdx});
+        if (!anyAdded) {
+          m_selectedChunk = *cand.chunkName;
+          m_selectedObjectIdx = cand.objIdx;
+          m_selectedMeshIdx = cand.meshIdx;
+          m_selectedFaceIdx = cand.faceIdx;
+          anyAdded = true;
+        }
+      }
     }
   }
 }

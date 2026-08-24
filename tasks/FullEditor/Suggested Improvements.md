@@ -34,9 +34,9 @@
 
 ## GUI
 - [-] Right-click menu (cut, copy, paste -- replaces, delete, resize) --> partially implemented with stubs
-- [ ] Add multiselect for Objects and Faces
-- [ ] Change multiselect (manual selection) binding to SHIFT (not Control, options menu may not be allocating this correctly, user check)
-- [ ] Left click + drag to select multiple (click vs drag)
+- [x] Add multiselect for Objects and Faces
+- [x] Change multiselect (manual selection) binding to SHIFT (not Control, options menu may not be allocating this correctly, user check)
+- [x] Left click + drag to select multiple (click vs drag)
 - [ ] Gizmos on all editable items (for multiple select, should just take centroid), should quantise/snap automatically --> move, resize/stretch, rotate
 - [ ] Aliases should appear in legend (small text, in brackets)
 - [ ] View all (prefix) chunks in legend
