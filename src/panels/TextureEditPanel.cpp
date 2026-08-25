@@ -55,6 +55,16 @@ static std::string FindAssetTimPath(const std::string &texName,
   return "";
 }
 
+struct TextureClipboard {
+  int width = 0;
+  int height = 0;
+  std::vector<uint8_t> rawIndices;
+  std::vector<TIMColor> directPixels;
+  bool isDirect = false;
+};
+
+static TextureClipboard s_textureClipboard;
+
 static int GetSelectionGridStep(bool isAltDown, float zoom) {
   // When Alt is held down, enable per-pixel (1x1) precision at any zoom level
   if (isAltDown) {
@@ -557,23 +567,366 @@ void TextureEditPanel::DrawCanvas(float canvasW, float canvasH) {
   }
 
   // Handle selection keyboard operations
+  // Right-click context menu trigger
+  if (isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    ImGui::OpenPopup("TextureSelectionContextMenu");
+  }
+
+  // Draw Context Menu
+  DrawSelectionContextMenu();
+
+  // Handle selection keyboard operations
   if (m_hasSelection && !m_isReadOnly) {
     if (ImGui::IsKeyPressed(ImGuiKey_Delete) ||
         ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
-      m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette,
-                        "Clear Selection");
-      TextureEditTools::FillSelection(m_workingTexture, m_currentPalette, 0,
-                                     m_selMinX, m_selMinY, m_selMaxX, m_selMaxY,
-                                     m_isReadOnly);
-      m_isDirty = true;
+      FillSelectionWithColor(0);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-      m_hasSelection = false;
+      Deselect();
     }
   }
 
   ImGui::EndChild();
   ImGui::PopStyleColor();
+}
+
+void TextureEditPanel::CopySelection() {
+  if (!m_hasSelection)
+    return;
+  int w = m_workingTexture.GetWidth();
+  int h = m_workingTexture.GetHeight();
+  int selW = m_selMaxX - m_selMinX + 1;
+  int selH = m_selMaxY - m_selMinY + 1;
+  if (selW <= 0 || selH <= 0 || w <= 0 || h <= 0)
+    return;
+
+  s_textureClipboard.width = selW;
+  s_textureClipboard.height = selH;
+  s_textureClipboard.isDirect = (m_workingTexture.GetBpp() == 2);
+  s_textureClipboard.rawIndices.resize(selW * selH);
+
+  const auto &raw = m_workingTexture.GetRawIndices();
+  for (int y = 0; y < selH; ++y) {
+    for (int x = 0; x < selW; ++x) {
+      int srcIdx = (m_selMinY + y) * w + (m_selMinX + x);
+      int dstIdx = y * selW + x;
+      s_textureClipboard.rawIndices[dstIdx] =
+          (srcIdx >= 0 && srcIdx < (int)raw.size()) ? raw[srcIdx] : 0;
+    }
+  }
+
+  if (s_textureClipboard.isDirect) {
+    const auto &direct = m_workingTexture.GetDecoded().directPixels;
+    s_textureClipboard.directPixels.resize(selW * selH);
+    for (int y = 0; y < selH; ++y) {
+      for (int x = 0; x < selW; ++x) {
+        int srcIdx = (m_selMinY + y) * w + (m_selMinX + x);
+        int dstIdx = y * selW + x;
+        s_textureClipboard.directPixels[dstIdx] =
+            (srcIdx >= 0 && srcIdx < (int)direct.size()) ? direct[srcIdx]
+                                                         : TIMColor{0, 0, 0, 255};
+      }
+    }
+  }
+}
+
+void TextureEditPanel::CutSelection() {
+  if (m_isReadOnly || !m_hasSelection)
+    return;
+  CopySelection();
+  m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette, "Cut Selection");
+  TextureEditTools::FillSelection(m_workingTexture, m_currentPalette, 0,
+                                 m_selMinX, m_selMinY, m_selMaxX, m_selMaxY,
+                                 m_isReadOnly);
+  m_isDirty = true;
+}
+
+void TextureEditPanel::PasteClipboard() {
+  if (m_isReadOnly || s_textureClipboard.width <= 0 ||
+      s_textureClipboard.height <= 0)
+    return;
+
+  int w = m_workingTexture.GetWidth();
+  int h = m_workingTexture.GetHeight();
+  if (w <= 0 || h <= 0)
+    return;
+
+  int startX = m_hasSelection ? m_selMinX : 0;
+  int startY = m_hasSelection ? m_selMinY : 0;
+
+  m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette, "Paste");
+
+  auto &raw = m_workingTexture.GetRawIndices();
+  for (int y = 0; y < s_textureClipboard.height; ++y) {
+    int dstY = startY + y;
+    if (dstY < 0 || dstY >= h)
+      continue;
+    for (int x = 0; x < s_textureClipboard.width; ++x) {
+      int dstX = startX + x;
+      if (dstX < 0 || dstX >= w)
+        continue;
+
+      int srcIdx = y * s_textureClipboard.width + x;
+      int dstIdx = dstY * w + dstX;
+      if (srcIdx < (int)s_textureClipboard.rawIndices.size() &&
+          dstIdx < (int)raw.size()) {
+        raw[dstIdx] = s_textureClipboard.rawIndices[srcIdx];
+      }
+    }
+  }
+
+  if (s_textureClipboard.isDirect && m_workingTexture.GetBpp() == 2) {
+    auto &direct = m_workingTexture.GetDecoded().directPixels;
+    for (int y = 0; y < s_textureClipboard.height; ++y) {
+      int dstY = startY + y;
+      if (dstY < 0 || dstY >= h)
+        continue;
+      for (int x = 0; x < s_textureClipboard.width; ++x) {
+        int dstX = startX + x;
+        if (dstX < 0 || dstX >= w)
+          continue;
+
+        int srcIdx = y * s_textureClipboard.width + x;
+        int dstIdx = dstY * w + dstX;
+        if (srcIdx < (int)s_textureClipboard.directPixels.size() &&
+            dstIdx < (int)direct.size()) {
+          direct[dstIdx] = s_textureClipboard.directPixels[srcIdx];
+        }
+      }
+    }
+  }
+
+  // Set selection marquee to cover pasted region
+  m_hasSelection = true;
+  m_selMinX = startX;
+  m_selMinY = startY;
+  m_selMaxX = std::clamp(startX + s_textureClipboard.width - 1, 0, w - 1);
+  m_selMaxY = std::clamp(startY + s_textureClipboard.height - 1, 0, h - 1);
+
+  m_workingTexture.ApplyPalette(m_currentPalette);
+  m_isDirty = true;
+}
+
+void TextureEditPanel::RevertSelection() {
+  if (m_isReadOnly || !m_hasSelection)
+    return;
+  int w = m_workingTexture.GetWidth();
+  int h = m_workingTexture.GetHeight();
+  if (w <= 0 || h <= 0)
+    return;
+
+  m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette,
+                    "Revert Selection");
+
+  auto &raw = m_workingTexture.GetRawIndices();
+  const auto &origRaw = m_originalTim.rawIndices;
+  for (int y = m_selMinY; y <= m_selMaxY; ++y) {
+    for (int x = m_selMinX; x <= m_selMaxX; ++x) {
+      int idx = y * w + x;
+      if (idx >= 0 && idx < (int)raw.size() && idx < (int)origRaw.size()) {
+        raw[idx] = origRaw[idx];
+      }
+    }
+  }
+
+  if (m_workingTexture.GetBpp() == 2) {
+    auto &direct = m_workingTexture.GetDecoded().directPixels;
+    const auto &origDirect = m_originalTim.directPixels;
+    for (int y = m_selMinY; y <= m_selMaxY; ++y) {
+      for (int x = m_selMinX; x <= m_selMaxX; ++x) {
+        int idx = y * w + x;
+        if (idx >= 0 && idx < (int)direct.size() &&
+            idx < (int)origDirect.size()) {
+          direct[idx] = origDirect[idx];
+        }
+      }
+    }
+  }
+
+  m_workingTexture.ApplyPalette(m_currentPalette);
+  m_isDirty = true;
+}
+
+void TextureEditPanel::FillSelectionWithColor(uint8_t colorIdx) {
+  if (m_isReadOnly || !m_hasSelection)
+    return;
+  m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette,
+                    (colorIdx == 0) ? "Clear Selection" : "Fill Selection");
+  TextureEditTools::FillSelection(m_workingTexture, m_currentPalette, colorIdx,
+                                 m_selMinX, m_selMinY, m_selMaxX, m_selMaxY,
+                                 m_isReadOnly);
+  m_isDirty = true;
+}
+
+void TextureEditPanel::FlipSelectionH() {
+  if (m_isReadOnly || !m_hasSelection)
+    return;
+  int w = m_workingTexture.GetWidth();
+  int h = m_workingTexture.GetHeight();
+  if (w <= 0 || h <= 0)
+    return;
+
+  m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette,
+                    "Flip Horizontal");
+
+  auto &raw = m_workingTexture.GetRawIndices();
+  int selW = m_selMaxX - m_selMinX + 1;
+
+  for (int y = m_selMinY; y <= m_selMaxY; ++y) {
+    for (int x = 0; x < selW / 2; ++x) {
+      int x1 = m_selMinX + x;
+      int x2 = m_selMaxX - x;
+      int idx1 = y * w + x1;
+      int idx2 = y * w + x2;
+      if (idx1 >= 0 && idx1 < (int)raw.size() && idx2 >= 0 &&
+          idx2 < (int)raw.size()) {
+        std::swap(raw[idx1], raw[idx2]);
+      }
+    }
+  }
+
+  if (m_workingTexture.GetBpp() == 2) {
+    auto &direct = m_workingTexture.GetDecoded().directPixels;
+    for (int y = m_selMinY; y <= m_selMaxY; ++y) {
+      for (int x = 0; x < selW / 2; ++x) {
+        int x1 = m_selMinX + x;
+        int x2 = m_selMaxX - x;
+        int idx1 = y * w + x1;
+        int idx2 = y * w + x2;
+        if (idx1 >= 0 && idx1 < (int)direct.size() && idx2 >= 0 &&
+            idx2 < (int)direct.size()) {
+          std::swap(direct[idx1], direct[idx2]);
+        }
+      }
+    }
+  }
+
+  m_workingTexture.ApplyPalette(m_currentPalette);
+  m_isDirty = true;
+}
+
+void TextureEditPanel::FlipSelectionV() {
+  if (m_isReadOnly || !m_hasSelection)
+    return;
+  int w = m_workingTexture.GetWidth();
+  int h = m_workingTexture.GetHeight();
+  if (w <= 0 || h <= 0)
+    return;
+
+  m_undoBuffer.Push(m_workingTexture.GetDecoded(), m_currentPalette,
+                    "Flip Vertical");
+
+  auto &raw = m_workingTexture.GetRawIndices();
+  int selH = m_selMaxY - m_selMinY + 1;
+
+  for (int y = 0; y < selH / 2; ++y) {
+    int y1 = m_selMinY + y;
+    int y2 = m_selMaxY - y;
+    for (int x = m_selMinX; x <= m_selMaxX; ++x) {
+      int idx1 = y1 * w + x;
+      int idx2 = y2 * w + x;
+      if (idx1 >= 0 && idx1 < (int)raw.size() && idx2 >= 0 &&
+          idx2 < (int)raw.size()) {
+        std::swap(raw[idx1], raw[idx2]);
+      }
+    }
+  }
+
+  if (m_workingTexture.GetBpp() == 2) {
+    auto &direct = m_workingTexture.GetDecoded().directPixels;
+    for (int y = 0; y < selH / 2; ++y) {
+      int y1 = m_selMinY + y;
+      int y2 = m_selMaxY - y;
+      for (int x = m_selMinX; x <= m_selMaxX; ++x) {
+        int idx1 = y1 * w + x;
+        int idx2 = y2 * w + x;
+        if (idx1 >= 0 && idx1 < (int)direct.size() && idx2 >= 0 &&
+            idx2 < (int)direct.size()) {
+          std::swap(direct[idx1], direct[idx2]);
+        }
+      }
+    }
+  }
+
+  m_workingTexture.ApplyPalette(m_currentPalette);
+  m_isDirty = true;
+}
+
+void TextureEditPanel::SelectAll() {
+  int w = m_workingTexture.GetWidth();
+  int h = m_workingTexture.GetHeight();
+  if (w <= 0 || h <= 0)
+    return;
+  m_hasSelection = true;
+  m_selMinX = 0;
+  m_selMinY = 0;
+  m_selMaxX = w - 1;
+  m_selMaxY = h - 1;
+}
+
+void TextureEditPanel::Deselect() {
+  m_hasSelection = false;
+}
+
+void TextureEditPanel::DrawSelectionContextMenu() {
+  if (ImGui::BeginPopup("TextureSelectionContextMenu")) {
+    int selW = m_hasSelection ? (m_selMaxX - m_selMinX + 1) : 0;
+    int selH = m_hasSelection ? (m_selMaxY - m_selMinY + 1) : 0;
+
+    if (m_hasSelection) {
+      ImGui::TextDisabled("Selection: %dx%d px (%d,%d to %d,%d)", selW, selH,
+                          m_selMinX, m_selMinY, m_selMaxX, m_selMaxY);
+      ImGui::Separator();
+    }
+
+    bool hasSel = m_hasSelection;
+    bool canEdit = !m_isReadOnly;
+    bool hasClip = (s_textureClipboard.width > 0 && s_textureClipboard.height > 0);
+
+    if (ImGui::MenuItem(ICON_FA_SCISSORS " Cut", "Ctrl+X", false, hasSel && canEdit)) {
+      CutSelection();
+    }
+    if (ImGui::MenuItem(ICON_FA_CLONE " Copy", "Ctrl+C", false, hasSel)) {
+      CopySelection();
+    }
+    if (ImGui::MenuItem(ICON_FA_CLIPBOARD " Paste", "Ctrl+V", false, hasClip && canEdit)) {
+      PasteClipboard();
+    }
+
+    ImGui::Separator();
+
+    std::string fillLabel = "Fill with Color #" + std::to_string(m_selectedColorIdx);
+    if (ImGui::MenuItem((ICON_FA_FILL_DRIP " " + fillLabel).c_str(), nullptr, false, hasSel && canEdit)) {
+      FillSelectionWithColor((uint8_t)m_selectedColorIdx);
+    }
+    if (ImGui::MenuItem(ICON_FA_ERASER " Clear (Transparent)", "Del", false, hasSel && canEdit)) {
+      FillSelectionWithColor(0);
+    }
+    if (ImGui::MenuItem(ICON_FA_CLOCK_ROTATE_LEFT " Revert Selection to Original", nullptr, false,
+                        hasSel && canEdit && m_hasOriginalAsset)) {
+      RevertSelection();
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::MenuItem(ICON_FA_ARROW_RIGHT_ARROW_LEFT " Flip Horizontal", nullptr, false, hasSel && canEdit)) {
+      FlipSelectionH();
+    }
+    if (ImGui::MenuItem(ICON_FA_UP_DOWN " Flip Vertical", nullptr, false, hasSel && canEdit)) {
+      FlipSelectionV();
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::MenuItem(ICON_FA_VECTOR_SQUARE " Select All", "Ctrl+A")) {
+      SelectAll();
+    }
+    if (ImGui::MenuItem(ICON_FA_XMARK " Deselect", "Esc", false, hasSel)) {
+      Deselect();
+    }
+
+    ImGui::EndPopup();
+  }
 }
 
 void TextureEditPanel::HandleToolRectSelect(const ImGuiIO &io,
@@ -883,19 +1236,33 @@ void TextureEditPanel::Draw(FileManager &fileManager, Textures &activeMapTexture
   if (ImGui::Begin(winTitle.c_str(), &m_isOpen, flags)) {
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
-    // Handle Ctrl+S, Ctrl+Z, Ctrl+Y inside Texture Editor window (if not read-only)
+    // Handle shortcuts inside Texture Editor window
     ImGuiIO &io = ImGui::GetIO();
-    if (!m_isReadOnly && m_isFocused) {
-      if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
-        Save(fileManager, activeMapTexture, currentMapPalette,
-             localGeometryOverlay, sceneViewport);
+    if (m_isFocused) {
+      if (!m_isReadOnly) {
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+          Save(fileManager, activeMapTexture, currentMapPalette,
+               localGeometryOverlay, sceneViewport);
+        }
+        if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+          Undo();
+        }
+        if ((io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y)) ||
+            (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))) {
+          Redo();
+        }
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X)) {
+          CutSelection();
+        }
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
+          PasteClipboard();
+        }
       }
-      if (io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z)) {
-        Undo();
+      if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C)) {
+        CopySelection();
       }
-      if ((io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y)) ||
-          (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z))) {
-        Redo();
+      if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A)) {
+        SelectAll();
       }
     }
 

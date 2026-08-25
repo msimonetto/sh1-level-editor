@@ -127,6 +127,18 @@ private:
   void DrawCanvas(float canvasW, float canvasH);
   void DrawClutEditor();
   void DrawColorPickerPopup();
+  void DrawSelectionContextMenu();
+
+  // Selection operations
+  void CutSelection();
+  void CopySelection();
+  void PasteClipboard();
+  void RevertSelection();
+  void FillSelectionWithColor(uint8_t colorIdx);
+  void FlipSelectionH();
+  void FlipSelectionV();
+  void SelectAll();
+  void Deselect();
 
   // Modular tool interaction handlers
   void HandleToolRectSelect(const ImGuiIO &io, const ImVec2 &mousePos,
