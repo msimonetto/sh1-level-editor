@@ -265,17 +265,17 @@ bool PaletteInspectorWidget::Draw(
     if (comboW < 50.0f) comboW = 50.0f;
 
     bool canStep = (numPalettes > 1);
-    if (!canStep) ImGui::BeginDisabled();
+    ImGui::BeginDisabled(!canStep);
     if (ImGui::ArrowButton("##PrevPal", ImGuiDir_Left)) {
       applyNewPalette(currentPalette - 1);
     }
-    if (!canStep) ImGui::EndDisabled();
+    ImGui::EndDisabled();
 
     ImGui::SameLine();
 
     ImGui::SetNextItemWidth(comboW);
     std::string comboPreview = std::to_string(currentPalette);
-    if (!canStep) ImGui::BeginDisabled();
+    ImGui::BeginDisabled(!canStep);
     if (ImGui::BeginCombo("##PaletteCombo", comboPreview.c_str(),
                           ImGuiComboFlags_HeightLarge)) {
       for (int i = 0; i < numPalettes; ++i) {
@@ -334,15 +334,15 @@ bool PaletteInspectorWidget::Draw(
       }
       ImGui::EndCombo();
     }
-    if (!canStep) ImGui::EndDisabled();
+    ImGui::EndDisabled();
 
     ImGui::SameLine();
 
-    if (!canStep) ImGui::BeginDisabled();
+    ImGui::BeginDisabled(!canStep);
     if (ImGui::ArrowButton("##NextPal", ImGuiDir_Right)) {
       applyNewPalette(currentPalette + 1);
     }
-    if (!canStep) ImGui::EndDisabled();
+    ImGui::EndDisabled();
 
     if (layout == PaletteWidgetLayout::Inline) {
       ImGui::SameLine();

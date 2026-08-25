@@ -46,6 +46,9 @@ bool TIMDecoder::Decode(const std::string& filepath, DecodedTIM& outTim) {
             return false;
         }
 
+        outTim.clutX = clut_hdr.x;
+        outTim.clutY = clut_hdr.y;
+
         int clut_data_len = clut_hdr.clut_length - sizeof(TIM_CLUT_HEADER);
         std::vector<uint16_t> clut_data(clut_data_len / 2);
         fread(clut_data.data(), 1, clut_data_len, file);
@@ -66,6 +69,9 @@ bool TIMDecoder::Decode(const std::string& filepath, DecodedTIM& outTim) {
         fclose(file);
         return false;
     }
+
+    outTim.imgX = img_hdr.x;
+    outTim.imgY = img_hdr.y;
 
     int img_data_len = img_hdr.img_length - sizeof(TIM_IMG_HEADER);
     std::vector<uint8_t> img_data(img_data_len);

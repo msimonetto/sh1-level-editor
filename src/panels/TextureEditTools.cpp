@@ -298,8 +298,7 @@ void TextureEditTools::DrawSidePanel(
 
   ImGui::Separator();
 
-  if (isReadOnly)
-    ImGui::BeginDisabled();
+  ImGui::BeginDisabled(isReadOnly);
   if (ImGui::Button(ICON_FA_FILE_IMPORT, ImVec2(34.0f, 34.0f))) {
     std::string path =
         FileDialog::OpenFile("PNG Files\0*.png;*.PNG\0All Files\0*.*\0");
@@ -307,8 +306,7 @@ void TextureEditTools::DrawSidePanel(
       ImportImageFile(workingTexture, currentPalette, path, isReadOnly);
     }
   }
-  if (isReadOnly)
-    ImGui::EndDisabled();
+  ImGui::EndDisabled();
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
     ImGui::BeginTooltip();
     ImGui::Text("Import Image (PNG)");

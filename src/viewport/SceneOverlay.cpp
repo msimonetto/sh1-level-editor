@@ -188,6 +188,13 @@ void SceneOverlay::RebuildChunkBatches(const std::string &chunkName,
           auto &b = oldBatches[i];
           const auto &rb = chunk.data->batches[i];
 
+          b.texName = rb.texName;
+          b.paletteRow = rb.paletteRow;
+          if (b.material.maps != nullptr) {
+            b.material.maps[MATERIAL_MAP_DIFFUSE].texture =
+                TextureCache::Get().Fetch(b.texName, b.paletteRow, workspaceDir);
+          }
+
           memcpy(b.mesh.vertices, rb.positions.data(),
                  rb.positions.size() * sizeof(float));
           memcpy(b.mesh.texcoords, rb.texcoords.data(),

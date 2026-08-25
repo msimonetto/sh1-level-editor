@@ -471,6 +471,13 @@ void LocalGeometryOverlay::RebuildChunkBatches(
           auto &b = oldBatches[i];
           const auto &rb = chunk.data->batches[i];
 
+          b.texName = rb.texName;
+          b.paletteRow = rb.paletteRow;
+          if (b.material.maps != nullptr) {
+            b.material.maps[MATERIAL_MAP_DIFFUSE].texture =
+                TextureCache::Get().Fetch(b.texName, b.paletteRow, workspaceDir);
+          }
+
           bool changedPos = memcmp(b.mesh.vertices, rb.positions.data(),
                                    rb.positions.size() * sizeof(float)) != 0;
           bool changedTex = memcmp(b.mesh.texcoords, rb.texcoords.data(),
@@ -534,7 +541,9 @@ void LocalGeometryOverlay::RebuildChunksUsingTexture(
       }
       if (usesTexture) {
         sceneViewport.RebuildChunkBatches(lc.data->chunkName, workspaceDir);
-        RebuildChunkBatches(lc.data->chunkName, workspaceDir);
+        if (!m_sharedChunks) {
+          RebuildChunkBatches(lc.data->chunkName, workspaceDir);
+        }
       }
     }
   }

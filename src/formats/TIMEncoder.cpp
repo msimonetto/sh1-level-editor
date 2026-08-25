@@ -38,8 +38,8 @@ bool TIMEncoder::Encode(const DecodedTIM& tim, const std::string& outPath) {
 
     if (has_clut) {
         TIM_CLUT_HEADER clut_hdr;
-        clut_hdr.x = 0; // Usually specific location in VRAM, default 0 for external tools
-        clut_hdr.y = 0;
+        clut_hdr.x = tim.clutX;
+        clut_hdr.y = tim.clutY;
         clut_hdr.width = (tim.palettes.empty()) ? 0 : tim.palettes[0].colors.size();
         clut_hdr.height = tim.palettes.size();
         
@@ -58,8 +58,8 @@ bool TIMEncoder::Encode(const DecodedTIM& tim, const std::string& outPath) {
     }
 
     TIM_IMG_HEADER img_hdr;
-    img_hdr.x = 0; // VRAM x
-    img_hdr.y = 0; // VRAM y
+    img_hdr.x = tim.imgX;
+    img_hdr.y = tim.imgY;
     img_hdr.height = tim.height;
     
     std::vector<uint8_t> img_data;

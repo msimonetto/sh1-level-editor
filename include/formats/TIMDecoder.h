@@ -19,6 +19,10 @@ struct DecodedTIM {
     int width = 0;
     int height = 0;
     int bpp = 0;
+    uint16_t clutX = 0;
+    uint16_t clutY = 0;
+    uint16_t imgX = 0;
+    uint16_t imgY = 0;
     
     std::vector<TIMPalette> palettes;
     std::vector<uint8_t> rawIndices;    // For 4-bit / 8-bit indexed

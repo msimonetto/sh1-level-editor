@@ -167,7 +167,7 @@ void TextureEditPanel::DrawToolbar(FileManager &fileManager,
                                   LocalGeometryOverlay &localGeometryOverlay,
                                   Viewport &sceneViewport) {
   if (m_isReadOnly) {
-    ImGui::BeginDisabled();
+    ImGui::BeginDisabled(true);
     ImGui::Button(ICON_FA_LOCK " Read-Only");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
@@ -175,24 +175,22 @@ void TextureEditPanel::DrawToolbar(FileManager &fileManager,
                         "Extract it to the workspace to enable saving.");
     }
   } else {
-    if (!m_isDirty)
-      ImGui::BeginDisabled();
+    bool canSave = m_isDirty;
+    ImGui::BeginDisabled(!canSave);
     if (ImGui::Button(ICON_FA_FLOPPY_DISK " Save")) {
       Save(fileManager, activeMapTexture, currentMapPalette,
            localGeometryOverlay, sceneViewport);
     }
-    if (!m_isDirty)
-      ImGui::EndDisabled();
+    ImGui::EndDisabled();
   }
 
   ImGui::SameLine();
-  if (m_isReadOnly || !m_isDirty)
-    ImGui::BeginDisabled();
+  bool canRevert = !m_isReadOnly && m_isDirty;
+  ImGui::BeginDisabled(!canRevert);
   if (ImGui::Button(ICON_FA_ROTATE_LEFT " Revert")) {
     Revert();
   }
-  if (m_isReadOnly || !m_isDirty)
-    ImGui::EndDisabled();
+  ImGui::EndDisabled();
 
   ImGui::SameLine();
   ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
@@ -511,8 +509,7 @@ void TextureEditPanel::DrawColorPickerPopup() {
       bool colorChanged = false;
 
       // 5-bit PS1 quantized sliders (0–31)
-      if (m_isReadOnly)
-        ImGui::BeginDisabled();
+      ImGui::BeginDisabled(m_isReadOnly);
 
       ImGui::Text("PS1 15-bit Quantized (0-31):");
       if (ImGui::SliderInt("Red (R5)", &m_editingR5, 0, 31)) {
@@ -538,8 +535,7 @@ void TextureEditPanel::DrawColorPickerPopup() {
         colorChanged = true;
       }
 
-      if (m_isReadOnly)
-        ImGui::EndDisabled();
+      ImGui::EndDisabled();
 
       if (colorChanged && !m_isReadOnly) {
         uint8_t r8 = (uint8_t)(m_editingR5 * 255 / 31);
@@ -601,8 +597,8 @@ void TextureEditPanel::DrawColorPickerPopup() {
       }
 
       // Revert individual color button
-      if (m_isReadOnly || !isColorDifferentFromOrig)
-        ImGui::BeginDisabled();
+      bool canRevertColor = !m_isReadOnly && isColorDifferentFromOrig;
+      ImGui::BeginDisabled(!canRevertColor);
       if (ImGui::Button(ICON_FA_ROTATE_LEFT " Revert Color to Original")) {
         m_editingColor = origColor;
         m_editingR5 = origColor.r * 31 / 255;
@@ -619,8 +615,7 @@ void TextureEditPanel::DrawColorPickerPopup() {
           m_isDirty = true;
         }
       }
-      if (m_isReadOnly || !isColorDifferentFromOrig)
-        ImGui::EndDisabled();
+      ImGui::EndDisabled();
 
       ImGui::Spacing();
       if (ImGui::Button("Close", ImVec2(80.0f, 0))) {
