@@ -102,15 +102,21 @@ void TextureEditTools::FillSelection(Textures &texture, int currentPalette,
   if (raw.empty() || w <= 0 || h <= 0)
     return;
 
+  int minX = std::clamp(selMinX, 0, w - 1);
+  int maxX = std::clamp(selMaxX, 0, w - 1);
+  int minY = std::clamp(selMinY, 0, h - 1);
+  int maxY = std::clamp(selMaxY, 0, h - 1);
+  if (minX > maxX || minY > maxY)
+    return;
+
   bool changed = false;
-  for (int y = selMinY; y <= selMaxY; ++y) {
-    for (int x = selMinX; x <= selMaxX; ++x) {
-      int idx = y * w + x;
-      if (idx >= 0 && idx < (int)raw.size()) {
-        if (raw[idx] != colorIdx) {
-          raw[idx] = colorIdx;
-          changed = true;
-        }
+  int span = maxX - minX + 1;
+  for (int y = minY; y <= maxY; ++y) {
+    uint8_t *row = &raw[y * w + minX];
+    for (int x = 0; x < span; ++x) {
+      if (row[x] != colorIdx) {
+        row[x] = colorIdx;
+        changed = true;
       }
     }
   }
@@ -130,26 +136,38 @@ bool TextureEditTools::ExportImageFile(Textures &texture, int currentPalette,
   if (w <= 0 || h <= 0)
     return false;
 
-  std::vector<Color> rgbaPixels(w * h);
+  int totalPixels = w * h;
+  std::vector<Color> rgbaPixels(totalPixels);
+
   if (texture.GetBpp() == 0 || texture.GetBpp() == 1) {
     const auto &raw = texture.GetRawIndices();
     const auto &pals = texture.GetPalettes();
     int palIdx = std::clamp(currentPalette, 0, (int)pals.size() - 1);
+    const auto *colors = (!pals.empty() && palIdx < (int)pals.size())
+                             ? pals[palIdx].colors.data()
+                             : nullptr;
+    size_t numColors = (!pals.empty() && palIdx < (int)pals.size())
+                           ? pals[palIdx].colors.size()
+                           : 0;
 
-    for (int i = 0; i < w * h; ++i) {
+    for (int i = 0; i < totalPixels; ++i) {
       uint8_t cIdx = (i < (int)raw.size()) ? raw[i] : 0;
-      TIMColor c =
-          (palIdx < (int)pals.size() && cIdx < (int)pals[palIdx].colors.size())
-              ? pals[palIdx].colors[cIdx]
-              : TIMColor{0, 0, 0, 0};
-      rgbaPixels[i] = Color{c.r, c.g, c.b, c.a};
+      if (colors && cIdx < numColors) {
+        const auto &c = colors[cIdx];
+        rgbaPixels[i] = Color{c.r, c.g, c.b, c.a};
+      } else {
+        rgbaPixels[i] = Color{0, 0, 0, 0};
+      }
     }
   } else {
     const auto &direct = texture.GetDecoded().directPixels;
-    for (int i = 0; i < w * h; ++i) {
-      TIMColor c =
-          (i < (int)direct.size()) ? direct[i] : TIMColor{0, 0, 0, 255};
-      rgbaPixels[i] = Color{c.r, c.g, c.b, c.a};
+    for (int i = 0; i < totalPixels; ++i) {
+      if (i < (int)direct.size()) {
+        const auto &c = direct[i];
+        rgbaPixels[i] = Color{c.r, c.g, c.b, c.a};
+      } else {
+        rgbaPixels[i] = Color{0, 0, 0, 255};
+      }
     }
   }
 
@@ -203,12 +221,38 @@ bool TextureEditTools::ImportImageFile(Textures &texture, int currentPalette,
 
   int palIdx = std::clamp(currentPalette, 0, (int)pals.size() - 1);
   const auto &paletteColors = pals[palIdx].colors;
+  if (paletteColors.empty()) {
+    UnloadImage(img);
+    return false;
+  }
+
+  // Pre-quantize palette colors once into 5-bit coordinates to eliminate
+  // recomputing divisions for every color on every single pixel!
+  struct PrecalcEntry {
+    int r5;
+    int g5;
+    int b5;
+    uint8_t colorIdx;
+    bool isTransparent;
+  };
+
+  std::vector<PrecalcEntry> precalcPal(paletteColors.size());
+  for (size_t c = 0; c < paletteColors.size(); ++c) {
+    const auto &pc = paletteColors[c];
+    precalcPal[c].r5 = pc.r * 31 / 255;
+    precalcPal[c].g5 = pc.g * 31 / 255;
+    precalcPal[c].b5 = pc.b * 31 / 255;
+    precalcPal[c].colorIdx = (uint8_t)c;
+    precalcPal[c].isTransparent = (pc.a == 0 && pc.r == 0 && pc.g == 0 && pc.b == 0);
+  }
+
   Color *srcPixels = (Color *)img.data;
   auto &raw = texture.GetRawIndices();
-  raw.resize(w * h);
+  int totalPixels = w * h;
+  raw.resize(totalPixels);
 
-  for (int i = 0; i < w * h; ++i) {
-    Color sc = srcPixels[i];
+  for (int i = 0; i < totalPixels; ++i) {
+    const Color &sc = srcPixels[i];
     if (sc.a < 128) {
       raw[i] = 0; // Transparent
     } else {
@@ -218,20 +262,17 @@ bool TextureEditTools::ImportImageFile(Textures &texture, int currentPalette,
       int g5 = sc.g * 31 / 255;
       int b5 = sc.b * 31 / 255;
 
-      for (size_t c = 0; c < paletteColors.size(); ++c) {
-        const auto &pc = paletteColors[c];
-        if (pc.a == 0 && (pc.r == 0 && pc.g == 0 && pc.b == 0))
+      for (const auto &pe : precalcPal) {
+        if (pe.isTransparent)
           continue; // Skip transparent entry for solid colors
-        int pr5 = pc.r * 31 / 255;
-        int pg5 = pc.g * 31 / 255;
-        int pb5 = pc.b * 31 / 255;
-        int dr = r5 - pr5;
-        int dg = g5 - pg5;
-        int db = b5 - pb5;
+        int dr = r5 - pe.r5;
+        int dg = g5 - pe.g5;
+        int db = b5 - pe.b5;
         int dist = dr * dr + dg * dg + db * db;
         if (dist < bestDist) {
           bestDist = dist;
-          bestIdx = (int)c;
+          bestIdx = pe.colorIdx;
+          if (dist == 0) break; // Exact match found
         }
       }
       raw[i] = (uint8_t)bestIdx;
@@ -285,7 +326,7 @@ void TextureEditTools::DrawSidePanel(
 
   DrawToolBtn(TextureEditTool::RectSelect, ICON_FA_VECTOR_SQUARE,
               "Rectangular Select",
-              "Select a rectangular pixel region on the texture.");
+              "Select region (snaps to 32x32 tiles).\nHold [Alt] for granular snap (16px / 8px / 4px / 1px based on zoom).");
 
   DrawToolBtn(TextureEditTool::FillBucket, ICON_FA_FILL_DRIP, "Fill Bucket",
               "Flood-fill contiguous pixels with selected palette color.");
@@ -368,14 +409,7 @@ void TextureEditTools::DrawSidePanel(
   if (ImGui::InvisibleButton("##ActiveColorBox", ImVec2(34.0f, 34.0f))) {
     editingColorIdx = selectedColorIdx;
     editingColor = activeCol;
-    editingR5 = activeCol.r * 31 / 255;
-    editingG5 = activeCol.g * 31 / 255;
-    editingB5 = activeCol.b * 31 / 255;
-    editingStp = (activeCol.a == 0)
-                     ? false
-                     : (activeCol.a < 255 || (activeCol.r == 0 &&
-                                              activeCol.g == 0 &&
-                                              activeCol.b == 0));
+    activeCol.ToR5G5B5(editingR5, editingG5, editingB5, editingStp);
     ImGui::OpenPopup("EditClutColorPopup");
   }
   if (ImGui::IsItemHovered()) {

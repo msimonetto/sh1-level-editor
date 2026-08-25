@@ -95,6 +95,7 @@ private:
   bool m_showPixelGrid = true;
   bool m_showTileGrid = true;
   bool m_shouldAutoFit = false;
+  std::string m_lastCheckedWorkspaceDir;
 
   void SetZoom(float newZoom);
 
@@ -110,6 +111,8 @@ private:
   int m_editingB5 = 0;
   bool m_editingStp = false;
 
+  void SetEditingColor(const TIMColor &c);
+
   void Save(FileManager &fileManager, Textures &activeMapTexture,
             int currentMapPalette,
             LocalGeometryOverlay &localGeometryOverlay,
@@ -124,4 +127,12 @@ private:
   void DrawCanvas(float canvasW, float canvasH);
   void DrawClutEditor();
   void DrawColorPickerPopup();
+
+  // Modular tool interaction handlers
+  void HandleToolRectSelect(const ImGuiIO &io, const ImVec2 &mousePos,
+                           const ImVec2 &p0, int w, int h, int px, int py,
+                           bool isInsidePixel);
+  void HandleToolPencilEraser(int w, int h, int px, int py, bool isInsidePixel);
+  void HandleToolFillBucket(int w, int h, int px, int py, bool isInsidePixel);
+  void HandleToolEyedropper(int w, int h, int px, int py, bool isInsidePixel);
 };
