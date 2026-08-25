@@ -73,7 +73,8 @@ public:
       const std::function<void(int colorIdx, TIMColor color)> &onColorSelected = nullptr,
       bool showDimensions = true,
       PaletteWidgetLayout layout = PaletteWidgetLayout::Stacked,
-      const char *label = "Palette:");
+      const char *label = "Palette:",
+      int selectedColorIdx = -1);
 };
 
 class TextureCanvasWidget {

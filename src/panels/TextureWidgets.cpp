@@ -229,7 +229,8 @@ bool PaletteInspectorWidget::Draw(
     Textures &activeTexture, int &currentPalette,
     const std::function<void(int newPalette)> &onPaletteChanged,
     const std::function<void(int colorIdx, TIMColor color)> &onColorSelected,
-    bool showDimensions, PaletteWidgetLayout layout, const char *label) {
+    bool showDimensions, PaletteWidgetLayout layout, const char *label,
+    int selectedColorIdx) {
   bool changed = false;
 
   if (showDimensions) {
@@ -395,6 +396,13 @@ bool PaletteInspectorWidget::Draw(
       drawList->AddRect(barPos,
                         ImVec2(barPos.x + availWidth, barPos.y + barHeight),
                         IM_COL32(80, 80, 80, 255));
+
+      if (selectedColorIdx >= 0 && selectedColorIdx < numColors) {
+        ImVec2 sp0(barPos.x + selectedColorIdx * swatchW, barPos.y);
+        ImVec2 sp1(barPos.x + (selectedColorIdx + 1) * swatchW,
+                   barPos.y + barHeight);
+        drawList->AddRect(sp0, sp1, IM_COL32(0, 220, 255, 255), 0.0f, 0, 2.0f);
+      }
 
       if (hoveredColorIdx >= 0 && hoveredColorIdx < numColors) {
         const auto &hc = pal.colors[hoveredColorIdx];

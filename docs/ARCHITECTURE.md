@@ -260,7 +260,7 @@ Modular ImGui windows providing specialized editing controls and inspectors.
 - **`TextureEditManager`**: Dynamic manager coordinating multiple simultaneous `TextureEditPanel` window instances with automatic deduplication per file path and pruning of closed windows.
 
 ### `TextureEditPanel.h`
-- **`TextureEditPanel`**: Standalone pop-out texture editor window for TIM texture inspection and modification. Operates on an isolated in-memory working copy of `DecodedTIM`, provides zoomable pixel canvas navigation with 1x1 pixel and 32x32 tile grids, hover inspection, CLUT palette table editing with 15-bit BGR555 quantization and STP flag toggling, and atomic Save/Revert synchronization with `TextureCache`, `TextureMapPanel`, and 3D viewport batch rebuilds. Automatically detects read-only status for non-workspace asset archives.
+- **`TextureEditPanel`**: Standalone pop-out texture editor window for TIM texture inspection and modification. Operates on an isolated in-memory working copy of `DecodedTIM`, provides zoomable pixel canvas navigation with 1x1 pixel and 32x32 tile grids, tool sidebar with square icon buttons (`Pencil`, `RectSelect`, `FillBucket`, `Eyedropper`, `Eraser`, `ImportExport`), window-local palette color selection tracking, CLUT palette table editing with 15-bit BGR555 quantization and STP flag toggling, and atomic Save/Revert synchronization with `TextureCache`, `TextureMapPanel`, and 3D viewport batch rebuilds. Automatically detects read-only status for non-workspace asset archives.
 
 ### `TextureMapPanel.h`
 - **`SelectedTile`**: Bounding box representing active UV tile selection.

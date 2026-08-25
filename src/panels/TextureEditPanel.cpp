@@ -234,14 +234,119 @@ void TextureEditPanel::DrawToolbar(FileManager &fileManager,
   }
 }
 
-void TextureEditPanel::DrawCanvas() {
-  ImVec2 avail = ImGui::GetContentRegionAvail();
-  float canvasW = avail.x;
-  float clutReserve = m_workingTexture.GetPalettes().empty()
-                          ? 0.0f
-                          : (ImGui::GetFrameHeightWithSpacing() + 10.0f);
-  float canvasH = std::max(120.0f, avail.y - clutReserve);
+void TextureEditPanel::DrawSidePanel(float canvasH) {
+  float sidePanelW = 46.0f;
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 28, 255));
+  ImGui::BeginChild("TextureEditToolsSidePanel", ImVec2(sidePanelW, canvasH), true,
+                    ImGuiWindowFlags_NoScrollbar |
+                        ImGuiWindowFlags_NoScrollWithMouse);
 
+  auto DrawToolBtn = [&](TextureEditTool tool, const char *icon,
+                         const char *name, const char *desc) {
+    bool isActive = (m_activeTool == tool);
+    if (isActive) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.45f, 0.75f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.86f, 1.0f, 1.0f));
+    }
+    if (ImGui::Button(icon, ImVec2(34.0f, 34.0f))) {
+      m_activeTool = tool;
+    }
+    if (isActive) {
+      ImGui::PopStyleColor(2);
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::BeginTooltip();
+      ImGui::Text("%s", name);
+      ImGui::Separator();
+      ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "%s", desc);
+      ImGui::EndTooltip();
+    }
+  };
+
+  DrawToolBtn(TextureEditTool::Pencil, ICON_FA_PENCIL, "Pencil / Pixel Edit",
+              "Draw directly onto texture with selected palette color.");
+
+  DrawToolBtn(TextureEditTool::RectSelect, ICON_FA_VECTOR_SQUARE,
+              "Rectangular Select",
+              "Select a rectangular pixel region on the texture.");
+
+  DrawToolBtn(TextureEditTool::FillBucket, ICON_FA_FILL_DRIP, "Fill Bucket",
+              "Flood-fill contiguous pixels with selected palette color.");
+
+  DrawToolBtn(TextureEditTool::Eyedropper, ICON_FA_EYE_DROPPER,
+              "Color Eyedropper",
+              "Click on texture pixels to select that palette color index.");
+
+  DrawToolBtn(TextureEditTool::Eraser, ICON_FA_ERASER, "Eraser",
+              "Paint with palette index 0 (transparent).");
+
+  ImGui::Separator();
+
+  DrawToolBtn(TextureEditTool::ImportExport, ICON_FA_FILE_IMPORT,
+              "Import / Export",
+              "Import or export texture to external image (PNG).");
+
+  ImGui::Separator();
+
+  // Active Color Swatch preview & quick color picker summon
+  TIMColor activeCol = {0, 0, 0, 255};
+  const auto &pals = m_workingTexture.GetPalettes();
+  if (!pals.empty()) {
+    int palIdx = std::clamp(m_currentPalette, 0, (int)pals.size() - 1);
+    if (m_selectedColorIdx >= 0 &&
+        m_selectedColorIdx < (int)pals[palIdx].colors.size()) {
+      activeCol = pals[palIdx].colors[m_selectedColorIdx];
+    }
+  }
+
+  ImVec2 curPos = ImGui::GetCursorScreenPos();
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  if (activeCol.a == 0 && activeCol.r == 0 && activeCol.g == 0 &&
+      activeCol.b == 0) {
+    drawList->AddRectFilled(curPos, ImVec2(curPos.x + 34.0f, curPos.y + 34.0f),
+                            IM_COL32(25, 25, 30, 255));
+    drawList->AddLine(curPos, ImVec2(curPos.x + 34.0f, curPos.y + 34.0f),
+                      IM_COL32(70, 70, 80, 255));
+  } else {
+    drawList->AddRectFilled(curPos, ImVec2(curPos.x + 34.0f, curPos.y + 34.0f),
+                            IM_COL32(activeCol.r, activeCol.g, activeCol.b, 255));
+  }
+  drawList->AddRect(curPos, ImVec2(curPos.x + 34.0f, curPos.y + 34.0f),
+                    IM_COL32(0, 220, 255, 255), 0.0f, 0, 2.0f);
+
+  if (ImGui::InvisibleButton("##ActiveColorBox", ImVec2(34.0f, 34.0f))) {
+    m_editingColorIdx = m_selectedColorIdx;
+    m_editingColor = activeCol;
+    m_editingR5 = activeCol.r * 31 / 255;
+    m_editingG5 = activeCol.g * 31 / 255;
+    m_editingB5 = activeCol.b * 31 / 255;
+    m_editingStp = (activeCol.a == 0)
+                       ? false
+                       : (activeCol.a < 255 || (activeCol.r == 0 &&
+                                                activeCol.g == 0 &&
+                                                activeCol.b == 0));
+    ImGui::OpenPopup("EditClutColorPopup");
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::BeginTooltip();
+    ImGui::Text("Selected Color: #%d (Palette %d)", m_selectedColorIdx,
+                m_currentPalette);
+    ImGui::Text("RGB: (%d, %d, %d)", activeCol.r, activeCol.g, activeCol.b);
+    ImGui::Text("Hex: #%02X%02X%02X", activeCol.r, activeCol.g, activeCol.b);
+    if (activeCol.a == 0) {
+      ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(Transparent STP)");
+    }
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f),
+                       "Click to edit 15-bit PS1 color.");
+    ImGui::EndTooltip();
+  }
+
+  ImGui::EndChild();
+  ImGui::PopStyleColor();
+}
+
+void TextureEditPanel::DrawCanvas(float canvasW, float canvasH) {
   ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(28, 28, 32, 255));
   ImGui::BeginChild("TextureEditCanvasChild", ImVec2(canvasW, canvasH), true,
                     ImGuiWindowFlags_NoScrollbar |
@@ -310,35 +415,48 @@ void TextureEditPanel::DrawCanvas() {
     ImVec2 hp1(hp0.x + m_zoom, hp0.y + m_zoom);
     drawList->AddRect(hp0, hp1, IM_COL32(255, 255, 0, 200), 0.0f, 0, 1.0f);
 
-    ImGui::BeginTooltip();
-    ImGui::Text("Pixel: (%d, %d)", px, py);
-    int tileX = 0, tileY = 0, tileIdx = 0;
-    TextureCanvasWidget::PixelToTileCoords(px, py, tileX, tileY, tileIdx, w, 32);
-    ImGui::Text("Tile (32x32): [%d, %d] (#%d)", tileX, tileY, tileIdx);
-      int pIdx = py * w + px;
+    int pIdx = py * w + px;
+    const auto &raw = m_workingTexture.GetRawIndices();
+    const auto &pals = m_workingTexture.GetPalettes();
 
-      const auto &raw = m_workingTexture.GetRawIndices();
-      const auto &pals = m_workingTexture.GetPalettes();
+    if (m_workingTexture.GetBpp() == 0 || m_workingTexture.GetBpp() == 1) {
+      if (pIdx < (int)raw.size()) {
+        uint8_t cIdx = raw[pIdx];
 
-      if (m_workingTexture.GetBpp() == 0 || m_workingTexture.GetBpp() == 1) {
-        if (pIdx < (int)raw.size()) {
-          uint8_t cIdx = raw[pIdx];
-          ImGui::Text("Color Index: #%d", cIdx);
-          if (!pals.empty()) {
-            int palIdx = std::clamp(m_currentPalette, 0, (int)pals.size() - 1);
-            if (cIdx < pals[palIdx].colors.size()) {
-              const auto &c = pals[palIdx].colors[cIdx];
-              ImGui::Text("RGB: (%d, %d, %d)", c.r, c.g, c.b);
-              ImGui::Text("Hex: #%02X%02X%02X", c.r, c.g, c.b);
-              if (c.a == 0) {
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
-                                   "(Transparent STP)");
-              }
+        // If Eyedropper tool is active and user clicks on a pixel, pick that palette color
+        if (m_activeTool == TextureEditTool::Eyedropper &&
+            ImGui::IsMouseClicked(0)) {
+          m_selectedColorIdx = cIdx;
+        }
+
+        ImGui::BeginTooltip();
+        ImGui::Text("Pixel: (%d, %d)", px, py);
+        int tileX = 0, tileY = 0, tileIdx = 0;
+        TextureCanvasWidget::PixelToTileCoords(px, py, tileX, tileY, tileIdx, w, 32);
+        ImGui::Text("Tile (32x32): [%d, %d] (#%d)", tileX, tileY, tileIdx);
+        ImGui::Text("Color Index: #%d%s", cIdx,
+                    (cIdx == m_selectedColorIdx) ? " (Selected)" : "");
+
+        if (!pals.empty()) {
+          int palIdx = std::clamp(m_currentPalette, 0, (int)pals.size() - 1);
+          if (cIdx < pals[palIdx].colors.size()) {
+            const auto &c = pals[palIdx].colors[cIdx];
+            ImGui::Text("RGB: (%d, %d, %d)", c.r, c.g, c.b);
+            ImGui::Text("Hex: #%02X%02X%02X", c.r, c.g, c.b);
+            if (c.a == 0) {
+              ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+                                 "(Transparent STP)");
             }
           }
         }
+        if (m_activeTool == TextureEditTool::Eyedropper) {
+          ImGui::Separator();
+          ImGui::TextColored(ImVec4(0.0f, 0.86f, 1.0f, 1.0f),
+                             "Click to pick color #%d", cIdx);
+        }
+        ImGui::EndTooltip();
       }
-    ImGui::EndTooltip();
+    }
   }
 
   ImGui::EndChild();
@@ -356,6 +474,7 @@ void TextureEditPanel::DrawClutEditor() {
         m_currentPalette = newPal;
       },
       [&](int colorIdx, TIMColor color) {
+        m_selectedColorIdx = colorIdx;
         m_editingColorIdx = colorIdx;
         m_editingColor = color;
         m_editingR5 = color.r * 31 / 255;
@@ -365,11 +484,14 @@ void TextureEditPanel::DrawClutEditor() {
                            ? false
                            : (color.a < 255 || (color.r == 0 && color.g == 0 &&
                                                 color.b == 0));
-        ImGui::OpenPopup("EditClutColorPopup");
+        if (ImGui::IsMouseDoubleClicked(0)) {
+          ImGui::OpenPopup("EditClutColorPopup");
+        }
       },
       false /* showDimensions */,
       PaletteWidgetLayout::Inline,
-      "Palette:");
+      "Palette:",
+      m_selectedColorIdx);
 }
 
 void TextureEditPanel::DrawColorPickerPopup() {
@@ -544,7 +666,7 @@ void TextureEditPanel::Draw(FileManager &fileManager, Textures &activeMapTexture
 
     // Minimum width required so that all toolbar buttons and controls fit comfortably without wrapping
     float minToolbarWidth = 720.0f;
-    float desiredWidth = std::max(minToolbarWidth, (float)w * m_zoom + 40.0f);
+    float desiredWidth = std::max(minToolbarWidth, 46.0f + (float)w * m_zoom + 50.0f);
 
     // Calculate vertical height adapting to all internal components:
     // Window titlebar + Header + Separator + Toolbar + Canvas (texture at initial zoom + padding) + CLUT (if any) + window padding
@@ -603,7 +725,18 @@ void TextureEditPanel::Draw(FileManager &fileManager, Textures &activeMapTexture
     ImGui::Separator();
     DrawToolbar(fileManager, activeMapTexture, currentMapPalette,
                 localGeometryOverlay, sceneViewport);
-    DrawCanvas();
+
+    float sidePanelW = 46.0f;
+    ImVec2 avail = ImGui::GetContentRegionAvail();
+    float clutReserve = m_workingTexture.GetPalettes().empty()
+                            ? 0.0f
+                            : (ImGui::GetFrameHeightWithSpacing() + 10.0f);
+    float canvasH = std::max(120.0f, avail.y - clutReserve);
+    float canvasW = std::max(120.0f, avail.x - sidePanelW - ImGui::GetStyle().ItemSpacing.x);
+
+    DrawSidePanel(canvasH);
+    ImGui::SameLine();
+    DrawCanvas(canvasW, canvasH);
     DrawClutEditor();
     DrawColorPickerPopup();
   }

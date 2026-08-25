@@ -13,6 +13,15 @@ class FileManager;
 class LocalGeometryOverlay;
 class Viewport;
 
+enum class TextureEditTool {
+  Pencil,       // Pixel Edit
+  RectSelect,   // Rectangular Selection
+  FillBucket,   // Flood Fill Bucket
+  Eyedropper,   // Eyedropper Color Picker
+  Eraser,       // Eraser
+  ImportExport  // Import / Export stub
+};
+
 class TextureEditPanel {
 public:
   TextureEditPanel();
@@ -30,6 +39,14 @@ public:
   void Focus() { m_focusRequested = true; }
   void SetPalette(int paletteRow);
 
+  // Selected color index in active palette
+  int GetSelectedColorIdx() const { return m_selectedColorIdx; }
+  void SetSelectedColorIdx(int idx) { m_selectedColorIdx = idx; }
+
+  // Active editor tool
+  TextureEditTool GetActiveTool() const { return m_activeTool; }
+  void SetActiveTool(TextureEditTool tool) { m_activeTool = tool; }
+
   // Renders the pop-out window if open
   void Draw(FileManager &fileManager, Textures &activeMapTexture,
             int currentMapPalette, LocalGeometryOverlay &localGeometryOverlay,
@@ -43,6 +60,8 @@ private:
   std::string m_timPath;
   std::string m_texName;
   int m_currentPalette = 0;
+  int m_selectedColorIdx = 0;
+  TextureEditTool m_activeTool = TextureEditTool::Pencil;
 
   // Canvas navigation state
   float m_zoom = 2.0f; // Continuous exponential zoom scale
@@ -76,7 +95,8 @@ private:
                    int currentMapPalette,
                    LocalGeometryOverlay &localGeometryOverlay,
                    Viewport &sceneViewport);
-  void DrawCanvas();
+  void DrawSidePanel(float canvasH);
+  void DrawCanvas(float canvasW, float canvasH);
   void DrawClutEditor();
   void DrawColorPickerPopup();
 };
