@@ -700,18 +700,247 @@ void TextureMapPanel::DrawUVCanvas(
   ImGui::Separator();
   ImGui::Checkbox("Snap UVs to 32x32 Grid", &snapToGrid);
 
-  ImVec2 minUV, maxUV;
-  RenderMesh snapBefore;
-  if (m_canvas.Draw(activeTexture, activeFace, activeMesh, snapToGrid,
-                    snapBefore, minUV, maxUV)) {
-      m_currentTile.minU = minUV.x;
-      m_currentTile.minV = minUV.y;
-      m_currentTile.maxU = maxUV.x;
-      m_currentTile.maxV = maxUV.y;
-      m_currentTile.rotationSteps = 0;
-      if (activeFace) {
-        m_currentTile.texName = activeFace->texName;
+  float availWidth = ImGui::GetContentRegionAvail().x;
+  float textureScale = (availWidth > 0.0f) ? (availWidth / 256.0f) : 1.0f;
+
+  ImVec2 imgPos = ImGui::GetCursorScreenPos();
+  float imgW = (float)activeTexture.GetWidth() * textureScale;
+  float imgH = (float)activeTexture.GetHeight() * textureScale;
+
+  // Render the Raylib texture in ImGui
+  ImGui::Image((ImTextureID)(intptr_t)activeTexture.GetTexture().id, ImVec2(imgW, imgH));
+  bool isImageHovered = ImGui::IsItemHovered();
+
+  if (ImGui::BeginPopupContextItem("TextureEditContextMenu")) {
+    if (ImGui::MenuItem("Reset UV to Original")) {}
+    if (ImGui::MenuItem("Save to Recent Tiles")) {}
+    if (ImGui::MenuItem("Open in Texture Edit")) {}
+    ImGui::EndPopup();
+  }
+
+  // Overlay UVs if a face is selected
+  if (activeFace && !activeFace->texName.empty()) {
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    bool isQuad = (activeFace->v[3] != 0xFF);
+    int numVerts = isQuad ? 4 : 3;
+
+    ImVec2 pts[4];
+    for (int i = 0; i < numVerts; ++i) {
+      pts[i].x = imgPos.x + activeFace->uv[i][0] * imgW;
+      pts[i].y = imgPos.y + activeFace->uv[i][1] * imgH;
+    }
+
+    bool uvsModified = false;
+    ImVec2 outMinUV, outMaxUV;
+    RenderMesh outSnapBefore;
+
+    // Single UV coordinate dragging with Middle Mouse Button (MMB)
+    if (isImageHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
+      ImVec2 mousePos = ImGui::GetMousePos();
+      int closestIdx = 0;
+      float minDistanceSq = 1e9f;
+      for (int i = 0; i < numVerts; ++i) {
+        float dx = mousePos.x - pts[i].x;
+        float dy = mousePos.y - pts[i].y;
+        float dSq = dx * dx + dy * dy;
+        if (dSq < minDistanceSq) {
+          minDistanceSq = dSq;
+          closestIdx = i;
+        }
       }
+      m_isDraggingSingleUV = true;
+      m_draggedVertexIdx = closestIdx;
+      if (activeMesh) {
+        m_dragStartMesh = *activeMesh;
+      }
+    }
+
+    if (m_isDraggingSingleUV && m_draggedVertexIdx >= 0 && m_draggedVertexIdx < numVerts) {
+      if (ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+        ImVec2 mousePos = ImGui::GetMousePos();
+        float tx = (mousePos.x - imgPos.x) / textureScale;
+        float ty = (mousePos.y - imgPos.y) / textureScale;
+
+        if (snapToGrid) {
+          tx = std::round(tx / 32.0f) * 32.0f;
+          ty = std::round(ty / 32.0f) * 32.0f;
+        } else {
+          tx = std::round(tx);
+          ty = std::round(ty);
+        }
+
+        float texW = (float)activeTexture.GetWidth();
+        float texH = (float)activeTexture.GetHeight();
+        tx = std::clamp(tx, 0.0f, texW);
+        ty = std::clamp(ty, 0.0f, texH);
+
+        float newU = (texW > 0.0f) ? (tx / texW) : 0.0f;
+        float newV = (texH > 0.0f) ? (ty / texH) : 0.0f;
+
+        activeFace->uv[m_draggedVertexIdx][0] = newU;
+        activeFace->uv[m_draggedVertexIdx][1] = newV;
+
+        pts[m_draggedVertexIdx].x = imgPos.x + newU * imgW;
+        pts[m_draggedVertexIdx].y = imgPos.y + newV * imgH;
+
+        ImGui::SetTooltip("Vertex %d UV: (%d, %d) px\nU: %.3f, V: %.3f",
+                          m_draggedVertexIdx, (int)tx, (int)ty, newU, newV);
+      }
+      if (ImGui::IsMouseReleased(ImGuiMouseButton_Middle)) {
+        m_isDraggingSingleUV = false;
+
+        float minU = activeFace->uv[0][0];
+        float maxU = activeFace->uv[0][0];
+        float minV = activeFace->uv[0][1];
+        float maxV = activeFace->uv[0][1];
+        for (int i = 1; i < numVerts; ++i) {
+          minU = std::min(minU, activeFace->uv[i][0]);
+          maxU = std::max(maxU, activeFace->uv[i][0]);
+          minV = std::min(minV, activeFace->uv[i][1]);
+          maxV = std::max(maxV, activeFace->uv[i][1]);
+        }
+
+        outMinUV = ImVec2(minU, minV);
+        outMaxUV = ImVec2(maxU, maxV);
+        outSnapBefore = m_dragStartMesh;
+        uvsModified = true;
+        m_draggedVertexIdx = -1;
+      }
+    }
+
+    // Left mouse button box dragging to update all UVs
+    if (isImageHovered && ImGui::IsMouseClicked(0) && !m_isDraggingSingleUV) {
+      m_isDraggingUV = true;
+      m_dragStartUV = ImGui::GetMousePos();
+      m_dragEndUV = m_dragStartUV;
+      if (activeMesh) {
+        m_dragStartMesh = *activeMesh;
+      }
+    }
+
+    if (m_isDraggingUV) {
+      if (ImGui::IsMouseDown(0)) {
+        m_dragEndUV = ImGui::GetMousePos();
+        ImVec2 p1 = m_dragStartUV;
+        ImVec2 p2 = m_dragEndUV;
+
+        if (snapToGrid) {
+          float tx1 = (p1.x - imgPos.x) / textureScale;
+          float ty1 = (p1.y - imgPos.y) / textureScale;
+          float tx2 = (p2.x - imgPos.x) / textureScale;
+          float ty2 = (p2.y - imgPos.y) / textureScale;
+
+          tx1 = std::floor(tx1 / 32.0f) * 32.0f;
+          ty1 = std::floor(ty1 / 32.0f) * 32.0f;
+          tx2 = std::floor(tx2 / 32.0f) * 32.0f;
+          ty2 = std::floor(ty2 / 32.0f) * 32.0f;
+
+          float min_tx = std::min(tx1, tx2);
+          float max_tx = std::max(tx1, tx2) + 32.0f;
+          float min_ty = std::min(ty1, ty2);
+          float max_ty = std::max(ty1, ty2) + 32.0f;
+
+          p1.x = imgPos.x + min_tx * textureScale;
+          p1.y = imgPos.y + min_ty * textureScale;
+          p2.x = imgPos.x + max_tx * textureScale;
+          p2.y = imgPos.y + max_ty * textureScale;
+        }
+
+        drawList->AddRect(p1, p2, IM_COL32(0, 255, 0, 255), 0.0f, 0, 2.0f);
+      }
+      if (ImGui::IsMouseReleased(0)) {
+        m_isDraggingUV = false;
+        m_dragEndUV = ImGui::GetMousePos();
+
+        ImVec2 p1 = m_dragStartUV;
+        ImVec2 p2 = m_dragEndUV;
+
+        if (snapToGrid) {
+          float tx1 = std::floor(((p1.x - imgPos.x) / textureScale) / 32.0f) * 32.0f;
+          float ty1 = std::floor(((p1.y - imgPos.y) / textureScale) / 32.0f) * 32.0f;
+          float tx2 = std::floor(((p2.x - imgPos.x) / textureScale) / 32.0f) * 32.0f;
+          float ty2 = std::floor(((p2.y - imgPos.y) / textureScale) / 32.0f) * 32.0f;
+
+          float min_tx = std::min(tx1, tx2);
+          float max_tx = std::max(tx1, tx2) + 32.0f;
+          float min_ty = std::min(ty1, ty2);
+          float max_ty = std::max(ty1, ty2) + 32.0f;
+
+          p1.x = imgPos.x + min_tx * textureScale;
+          p1.y = imgPos.y + min_ty * textureScale;
+          p2.x = imgPos.x + max_tx * textureScale;
+          p2.y = imgPos.y + max_ty * textureScale;
+        }
+
+        float u1 = std::clamp((p1.x - imgPos.x) / imgW, 0.0f, 1.0f);
+        float v1 = std::clamp((p1.y - imgPos.y) / imgH, 0.0f, 1.0f);
+        float u2 = std::clamp((p2.x - imgPos.x) / imgW, 0.0f, 1.0f);
+        float v2 = std::clamp((p2.y - imgPos.y) / imgH, 0.0f, 1.0f);
+
+        float minU = std::min(u1, u2);
+        float maxU = std::max(u1, u2);
+        float minV = std::min(v1, v2);
+        float maxV = std::max(v1, v2);
+
+        float cx = 0, cy = 0;
+        for (int i = 0; i < numVerts; i++) {
+          cx += activeFace->uv[i][0];
+          cy += activeFace->uv[i][1];
+        }
+        cx /= numVerts;
+        cy /= numVerts;
+
+        for (int i = 0; i < numVerts; ++i) {
+          activeFace->uv[i][0] = (activeFace->uv[i][0] < cx) ? minU : maxU;
+          activeFace->uv[i][1] = (activeFace->uv[i][1] < cy) ? minV : maxV;
+        }
+
+        outMinUV = ImVec2(minU, minV);
+        outMaxUV = ImVec2(maxU, maxV);
+        outSnapBefore = m_dragStartMesh;
+        uvsModified = true;
+      }
+    }
+
+    // Draw UV polygon lines
+    ImU32 col = IM_COL32(255, 255, 0, 255);
+    float thickness = 2.0f;
+    for (int i = 0; i < numVerts; ++i) {
+      drawList->AddLine(pts[i], pts[(i + 1) % numVerts], col, thickness);
+    }
+
+    // Draw UV vertices
+    for (int i = 0; i < numVerts; ++i) {
+      drawList->AddCircleFilled(pts[i], 3.0f, IM_COL32(255, 0, 0, 255));
+    }
+
+    // Hover or Active vertex highlight
+    if (m_isDraggingSingleUV && m_draggedVertexIdx >= 0 && m_draggedVertexIdx < numVerts) {
+      drawList->AddCircle(pts[m_draggedVertexIdx], 6.0f, IM_COL32(0, 255, 255, 255), 0, 2.0f);
+      drawList->AddCircleFilled(pts[m_draggedVertexIdx], 4.0f, IM_COL32(0, 255, 255, 200));
+    } else if (isImageHovered && !m_isDraggingUV) {
+      ImVec2 mousePos = ImGui::GetMousePos();
+      int hoverIdx = 0;
+      float minDistanceSq = 1e9f;
+      for (int i = 0; i < numVerts; ++i) {
+        float dx = mousePos.x - pts[i].x;
+        float dy = mousePos.y - pts[i].y;
+        float dSq = dx * dx + dy * dy;
+        if (dSq < minDistanceSq) {
+          minDistanceSq = dSq;
+          hoverIdx = i;
+        }
+      }
+      drawList->AddCircle(pts[hoverIdx], 5.5f, IM_COL32(0, 255, 255, 200), 0, 1.5f);
+    }
+
+    if (uvsModified) {
+      m_currentTile.minU = outMinUV.x;
+      m_currentTile.minV = outMinUV.y;
+      m_currentTile.maxU = outMaxUV.x;
+      m_currentTile.maxV = outMaxUV.y;
+      m_currentTile.rotationSteps = 0;
+      m_currentTile.texName = activeFace->texName;
       m_currentTile.palette = currentPalette;
 
       PushRecentTile(m_currentTile);
@@ -721,7 +950,7 @@ void TextureMapPanel::DrawUVCanvas(
         RenderMesh snapAfter = *activeMesh;
         history.Push({localGeometryOverlay.m_selectedChunk,
                       localGeometryOverlay.m_selectedObjectIdx,
-                      localGeometryOverlay.m_selectedMeshIdx, snapBefore,
+                      localGeometryOverlay.m_selectedMeshIdx, outSnapBefore,
                       snapAfter, "Edit UVs"});
         sceneViewport.RebuildChunkBatches(localGeometryOverlay.m_selectedChunk,
                                           fileManager.GetWorkspaceDir());
@@ -730,6 +959,7 @@ void TextureMapPanel::DrawUVCanvas(
             fileManager.GetWorkspaceDir());
       }
     }
+  }
 }
 
 void TextureMapPanel::DrawRecentTilesGrid(

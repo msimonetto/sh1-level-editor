@@ -7,7 +7,6 @@
 #include "raylib.h"
 #include "viewport/LocalGeometryOverlay.h"
 #include "viewport/SceneOverlay.h"
-#include "panels/TextureEditPanel.h"
 #include <deque>
 #include <functional>
 #include <set>
@@ -75,13 +74,19 @@ private:
 
   bool snapToGrid = true;
 
+  // UV dragging state
+  bool m_isDraggingUV = false;
+  bool m_isDraggingSingleUV = false;
+  int m_draggedVertexIdx = -1;
+  ImVec2 m_dragStartUV;
+  ImVec2 m_dragEndUV;
+  RenderMesh m_dragStartMesh;
+
   // Tile Paint & Recent Tiles state
   bool m_tilePaintModeActive = false;
   std::deque<SelectedTile> m_recentTiles;
   size_t m_maxRecentTiles = 16;
   SelectedTile m_currentTile;
-
-  TextureEditPanel m_canvas;
 
   // Helper methods
   void EnsureRecentTilesLoaded(const std::string &workspaceDir);
