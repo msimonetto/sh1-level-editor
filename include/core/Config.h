@@ -14,7 +14,6 @@ public:
   std::string LastTexturePath;
   std::string LastIPDPath;
   bool IsHiDPI = false;
-  float TextureScale = 2.0f;
 
   // Directories
   std::string ProjectDirectory = "";

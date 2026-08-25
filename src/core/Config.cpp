@@ -92,7 +92,6 @@ void Config::Load() {
             if (key == "LastTexturePath") LastTexturePath = value;
             else if (key == "LastIPDPath") LastIPDPath = value;
             else if (key == "IsHiDPI") IsHiDPI = (value == "1" || value == "true");
-            else if (key == "TextureScale") TextureScale = std::stof(value);
             else if (key == "ProjectDirectory") ProjectDirectory = value;
             else if (key == "GameDirectory") GameDirectory = value;
             else if (key == "SelectedPrefix") SelectedPrefix = value;
@@ -140,7 +139,6 @@ void Config::Save() {
         file << "LastTexturePath=" << LastTexturePath << "\n";
         file << "LastIPDPath=" << LastIPDPath << "\n";
         file << "IsHiDPI=" << (IsHiDPI ? "1" : "0") << "\n";
-        file << "TextureScale=" << TextureScale << "\n";
         file << "ProjectDirectory=" << ProjectDirectory << "\n";
         file << "GameDirectory=" << GameDirectory << "\n";
         file << "SelectedPrefix=" << SelectedPrefix << "\n";

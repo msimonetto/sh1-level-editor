@@ -245,11 +245,11 @@ Modular ImGui windows providing specialized editing controls and inspectors.
 - **`SettingsPanel`**: Editor preferences panel for editing paths, interface theme colors, grid dimensions, wireframe settings, keybindings, and undo buffer depth.
 
 ### `TextureEditPanel.h`
-- **`TextureEditPanel`**: 2D texture editing canvas for manipulating individual UV vertices, viewing CLUT color tables, and editing raw pixel textures.
+- **`TextureEditPanel`**: 2D texture editing canvas for manipulating UV vertices and arbitrary TIM file path loading/browsing (`DrawFromFileControls`).
 
 ### `TextureMapPanel.h`
 - **`SelectedTile`**: Bounding box representing active UV tile selection.
-- **`TextureMapPanel`**: Texture palette browser. Displays loaded TIMs, CLUT row selector, tile grid picker, and controls for 3D face paint mode.
+- **`TextureMapPanel`**: Texture palette browser. Displays loaded TIMs, CLUT row selector with interactive color bar, active dependency tracking via `DependencyManager`, tile grid picker, and controls for 3D face paint mode.
 
 ### `ViewportToolsPanel.h`
 - **`ViewportMode`**: Enum defining active editor viewport modes (`Scene`, `LocalGeometry`, `Collision`, `DoorsAndWaypoints`, `Spawns`, `Camera`, `Audio`, `TextureEditor`).
