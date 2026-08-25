@@ -18,7 +18,7 @@
 #include "panels/ChunksPanel.h"
 #include "panels/DependenciesPanel.h"
 #include "panels/TextureMapPanel.h"
-#include "panels/TextureEditPanel.h"
+#include "panels/TextureEditManager.h"
 #include "panels/ViewportToolsPanel.h"
 #include "panels/MapsPanel.h"
 #include "panels/OutlinerPanel.h"
@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
   // Enable Docking
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.ConfigWindowsMoveFromTitleBarOnly = true;
 
   if (Config::Get().IsHiDPI) {
     ImGui::GetIO().FontGlobalScale = 2.0f;
@@ -100,8 +101,8 @@ int main(int argc, char **argv) {
   
   OutlinerPanel sceneOutliner;
   TextureMapPanel textureWindow;
-  TextureEditPanel textureEditWindow;
-  textureWindow.SetTextureEditPanel(&textureEditWindow);
+  TextureEditManager textureEditManager;
+  textureWindow.SetTextureEditManager(&textureEditManager);
 
   ViewportSync viewportSync;
   viewportSync.Initialize(viewport, localGeometryOverlay);
@@ -312,8 +313,8 @@ int main(int argc, char **argv) {
     textureWindow.Draw(activeTexture, currentPalette, fileManager, dependencyManager,
                        viewport, localGeometryOverlay, history);
 
-    textureEditWindow.Draw(fileManager, activeTexture, currentPalette,
-                           localGeometryOverlay, viewport);
+    textureEditManager.Draw(fileManager, activeTexture, currentPalette,
+                            localGeometryOverlay, viewport);
 
     viewport.SetActiveMode(viewportToolsPanel.GetActiveMode());
     viewportToolsPanel.SetActiveViewport(&viewport);

@@ -1,5 +1,5 @@
 #include "panels/TextureMapPanel.h"
-#include "panels/TextureEditPanel.h"
+#include "panels/TextureEditManager.h"
 #include "viewport/Viewport.h"
 #include "core/Config.h"
 #include "core/FileDialog.h"
@@ -391,8 +391,9 @@ void TextureMapPanel::DrawUVCanvas(
   ImGui::Checkbox("Snap UVs to 32x32 Grid", &snapToGrid);
   ImGui::SameLine();
   if (ImGui::Button(ICON_FA_UP_RIGHT_FROM_SQUARE " Open in Texture Edit")) {
-    if (m_textureEditPanel && !Config::Get().LastTexturePath.empty()) {
-      m_textureEditPanel->Open(Config::Get().LastTexturePath, currentPalette);
+    if (m_textureEditManager && !Config::Get().LastTexturePath.empty()) {
+      m_textureEditManager->Open(Config::Get().LastTexturePath, fileManager,
+                                 currentPalette);
     }
   }
 
@@ -411,8 +412,9 @@ void TextureMapPanel::DrawUVCanvas(
     if (ImGui::MenuItem("Reset UV to Original")) {}
     if (ImGui::MenuItem("Save to Recent Tiles")) {}
     if (ImGui::MenuItem("Open in Texture Edit")) {
-      if (m_textureEditPanel && !Config::Get().LastTexturePath.empty()) {
-        m_textureEditPanel->Open(Config::Get().LastTexturePath, currentPalette);
+      if (m_textureEditManager && !Config::Get().LastTexturePath.empty()) {
+        m_textureEditManager->Open(Config::Get().LastTexturePath, fileManager,
+                                   currentPalette);
       }
     }
     ImGui::EndPopup();
@@ -530,10 +532,10 @@ void TextureMapPanel::DrawUVCanvas(
           float tx2 = (p2.x - imgPos.x) / textureScale;
           float ty2 = (p2.y - imgPos.y) / textureScale;
 
-          tx1 = std::floor(tx1 / 32.0f) * 32.0f;
-          ty1 = std::floor(ty1 / 32.0f) * 32.0f;
-          tx2 = std::floor(tx2 / 32.0f) * 32.0f;
-          ty2 = std::floor(ty2 / 32.0f) * 32.0f;
+          tx1 = TextureCanvasWidget::SnapCoord32(tx1);
+          ty1 = TextureCanvasWidget::SnapCoord32(ty1);
+          tx2 = TextureCanvasWidget::SnapCoord32(tx2);
+          ty2 = TextureCanvasWidget::SnapCoord32(ty2);
 
           float min_tx = std::min(tx1, tx2);
           float max_tx = std::max(tx1, tx2) + 32.0f;
@@ -556,10 +558,10 @@ void TextureMapPanel::DrawUVCanvas(
         ImVec2 p2 = m_dragEndUV;
 
         if (snapToGrid) {
-          float tx1 = std::floor(((p1.x - imgPos.x) / textureScale) / 32.0f) * 32.0f;
-          float ty1 = std::floor(((p1.y - imgPos.y) / textureScale) / 32.0f) * 32.0f;
-          float tx2 = std::floor(((p2.x - imgPos.x) / textureScale) / 32.0f) * 32.0f;
-          float ty2 = std::floor(((p2.y - imgPos.y) / textureScale) / 32.0f) * 32.0f;
+          float tx1 = TextureCanvasWidget::SnapCoord32((p1.x - imgPos.x) / textureScale);
+          float ty1 = TextureCanvasWidget::SnapCoord32((p1.y - imgPos.y) / textureScale);
+          float tx2 = TextureCanvasWidget::SnapCoord32((p2.x - imgPos.x) / textureScale);
+          float ty2 = TextureCanvasWidget::SnapCoord32((p2.y - imgPos.y) / textureScale);
 
           float min_tx = std::min(tx1, tx2);
           float max_tx = std::max(tx1, tx2) + 32.0f;

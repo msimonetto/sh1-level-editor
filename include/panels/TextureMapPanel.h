@@ -16,11 +16,11 @@
 
 class DependencyManager;
 class Viewport;
-class TextureEditPanel;
+class TextureEditManager;
 
 class TextureMapPanel {
 public:
-  void SetTextureEditPanel(TextureEditPanel *panel) { m_textureEditPanel = panel; }
+  void SetTextureEditManager(TextureEditManager *manager) { m_textureEditManager = manager; }
 
   void Draw(Textures &activeTexture, int &currentPalette,
             FileManager &fileManager, DependencyManager &dependencyManager,
@@ -50,7 +50,7 @@ public:
 
 private:
   TextureSelectorWidget m_textureSelector;
-  TextureEditPanel *m_textureEditPanel = nullptr;
+  TextureEditManager *m_textureEditManager = nullptr;
 
   // Selection state tracking
   std::string lastSelChunk;

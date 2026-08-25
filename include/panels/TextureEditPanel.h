@@ -5,7 +5,7 @@
 #include "formats/TIMEncoder.h"
 #include "panels/TextureWidgets.h"
 #include "imgui.h"
-#include "raylib.h"
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -19,9 +19,16 @@ public:
   ~TextureEditPanel();
 
   // Summons the pop-out window for a specific TIM texture path and palette row
-  void Open(const std::string &timPath, int initialPaletteRow = 0);
+  void Open(const std::string &timPath, FileManager &fileManager, int initialPaletteRow = 0);
+  void Open(const std::string &timPath, bool isReadOnly = false, int initialPaletteRow = 0);
   void Close();
   bool IsOpen() const { return m_isOpen; }
+  const std::string &GetTimPath() const { return m_timPath; }
+  const std::string &GetTexName() const { return m_texName; }
+  bool IsReadOnly() const { return m_isReadOnly; }
+
+  void Focus() { m_focusRequested = true; }
+  void SetPalette(int paletteRow);
 
   // Renders the pop-out window if open
   void Draw(FileManager &fileManager, Textures &activeMapTexture,
@@ -31,14 +38,20 @@ public:
 private:
   bool m_isOpen = false;
   bool m_isDirty = false;
+  bool m_isReadOnly = false;
+  bool m_focusRequested = false;
   std::string m_timPath;
   std::string m_texName;
   int m_currentPalette = 0;
 
   // Canvas navigation state
-  float m_zoom = 2.0f; // 1x to 16x zoom
+  float m_zoom = 2.0f; // Continuous exponential zoom scale
   ImVec2 m_panOffset = ImVec2(0.0f, 0.0f);
   bool m_showPixelGrid = true;
+  bool m_showTileGrid = true;
+  bool m_shouldAutoFit = false;
+
+  void SetZoom(float newZoom);
 
   // Working copy of texture data
   Textures m_workingTexture;

@@ -509,6 +509,37 @@ void LocalGeometryOverlay::RebuildChunkBatches(
   }
 }
 
+void LocalGeometryOverlay::RebuildChunksUsingTexture(
+    const std::string &texName, const std::string &workspaceDir,
+    Viewport &sceneViewport) {
+  if (texName.empty())
+    return;
+
+  for (const auto &lc : GetChunks()) {
+    if (lc.data) {
+      bool usesTexture = false;
+      for (const auto &name : lc.data->localTexNames) {
+        if (name == texName) {
+          usesTexture = true;
+          break;
+        }
+      }
+      if (!usesTexture) {
+        for (const auto &name : lc.data->globalTexNames) {
+          if (name == texName) {
+            usesTexture = true;
+            break;
+          }
+        }
+      }
+      if (usesTexture) {
+        sceneViewport.RebuildChunkBatches(lc.data->chunkName, workspaceDir);
+        RebuildChunkBatches(lc.data->chunkName, workspaceDir);
+      }
+    }
+  }
+}
+
 void LocalGeometryOverlay::HandlePicking(Viewport &vp, Ray ray) {
   if (m_texManager && m_texManager->IsTilePaintModeActive() && m_editMode == EditMode::Face) {
     return;

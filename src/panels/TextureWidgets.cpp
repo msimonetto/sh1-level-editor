@@ -229,7 +229,7 @@ bool PaletteInspectorWidget::Draw(
     Textures &activeTexture, int &currentPalette,
     const std::function<void(int newPalette)> &onPaletteChanged,
     const std::function<void(int colorIdx, TIMColor color)> &onColorSelected,
-    bool showDimensions) {
+    bool showDimensions, PaletteWidgetLayout layout, const char *label) {
   bool changed = false;
 
   if (showDimensions) {
@@ -251,14 +251,17 @@ bool PaletteInspectorWidget::Draw(
       changed = true;
     };
 
-    ImGui::Text("CLUT Row:");
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s", label ? label : "Palette:");
     ImGui::SameLine();
 
-    float btnW = 22.0f;
+    float btnW = (layout == PaletteWidgetLayout::Inline) ? 20.0f : 22.0f;
     float spacing = ImGui::GetStyle().ItemSpacing.x;
-    float comboW =
-        ImGui::GetContentRegionAvail().x - (btnW * 2.0f + spacing * 2.0f);
-    if (comboW < 80.0f) comboW = 80.0f;
+    float comboW = (layout == PaletteWidgetLayout::Inline)
+                       ? 65.0f
+                       : (ImGui::GetContentRegionAvail().x -
+                          (btnW * 2.0f + spacing * 2.0f));
+    if (comboW < 50.0f) comboW = 50.0f;
 
     bool canStep = (numPalettes > 1);
     if (!canStep) ImGui::BeginDisabled();
@@ -339,6 +342,10 @@ bool PaletteInspectorWidget::Draw(
       applyNewPalette(currentPalette + 1);
     }
     if (!canStep) ImGui::EndDisabled();
+
+    if (layout == PaletteWidgetLayout::Inline) {
+      ImGui::SameLine();
+    }
   }
 
   if (!activeTexture.GetPalettes().empty()) {
@@ -347,7 +354,9 @@ bool PaletteInspectorWidget::Draw(
     const auto &pal = activeTexture.GetPalettes()[palIdx];
     if (!pal.colors.empty()) {
       float availWidth = ImGui::GetContentRegionAvail().x;
-      float barHeight = 16.0f;
+      float barHeight = (layout == PaletteWidgetLayout::Inline)
+                            ? ImGui::GetFrameHeight()
+                            : 16.0f;
       ImVec2 barPos = ImGui::GetCursorScreenPos();
       ImDrawList *drawList = ImGui::GetWindowDrawList();
 
@@ -412,4 +421,121 @@ bool PaletteInspectorWidget::Draw(
   }
 
   return changed;
+}
+
+// -----------------------------------------------------------------------------
+// TextureCanvasWidget Implementation
+// -----------------------------------------------------------------------------
+
+void TextureCanvasWidget::DrawCheckeredBackground(ImDrawList *drawList,
+                                                  ImVec2 pos, ImVec2 size,
+                                                  float checkSize) {
+  if (!drawList || size.x <= 0.0f || size.y <= 0.0f || checkSize <= 0.0f)
+    return;
+
+  for (float y = pos.y; y < pos.y + size.y; y += checkSize) {
+    for (float x = pos.x; x < pos.x + size.x; x += checkSize) {
+      int ix = (int)((x - pos.x) / checkSize);
+      int iy = (int)((y - pos.y) / checkSize);
+      ImU32 col = ((ix + iy) % 2 == 0) ? IM_COL32(35, 35, 40, 255)
+                                       : IM_COL32(25, 25, 30, 255);
+      drawList->AddRectFilled(
+          ImVec2(x, y),
+          ImVec2(std::min(x + checkSize, pos.x + size.x),
+                 std::min(y + checkSize, pos.y + size.y)),
+          col);
+    }
+  }
+}
+
+bool TextureCanvasWidget::ScreenToPixelCoords(ImVec2 mousePos, ImVec2 imgPos,
+                                              float scale, int texWidth,
+                                              int texHeight, int &outPx,
+                                              int &outPy) {
+  if (scale <= 0.0f || texWidth <= 0 || texHeight <= 0)
+    return false;
+
+  float scaledW = (float)texWidth * scale;
+  float scaledH = (float)texHeight * scale;
+
+  if (mousePos.x < imgPos.x || mousePos.x >= imgPos.x + scaledW ||
+      mousePos.y < imgPos.y || mousePos.y >= imgPos.y + scaledH) {
+    return false;
+  }
+
+  outPx = std::clamp((int)((mousePos.x - imgPos.x) / scale), 0, texWidth - 1);
+  outPy = std::clamp((int)((mousePos.y - imgPos.y) / scale), 0, texHeight - 1);
+  return true;
+}
+
+void TextureCanvasWidget::PixelToTileCoords(int px, int py, int &outTileX,
+                                           int &outTileY, int &outTileIdx,
+                                           int texWidth, int tileSize) {
+  if (tileSize <= 0) tileSize = 32;
+  outTileX = px / tileSize;
+  outTileY = py / tileSize;
+  int tilesX = std::max(1, texWidth / tileSize);
+  outTileIdx = outTileY * tilesX + outTileX;
+}
+
+float TextureCanvasWidget::SnapCoord32(float val) {
+  return std::floor(val / 32.0f) * 32.0f;
+}
+
+// -----------------------------------------------------------------------------
+// TextureGridWidget Implementation
+// -----------------------------------------------------------------------------
+
+void TextureGridWidget::DrawPixelGrid(ImDrawList *drawList, ImVec2 p0,
+                                      ImVec2 p1, int texW, int texH,
+                                      float zoom, bool skipTileLines,
+                                      ImU32 color) {
+  if (!drawList || zoom < 4.0f || texW <= 0 || texH <= 0)
+    return;
+
+  for (int x = 0; x <= texW; ++x) {
+    if (skipTileLines && (x % 32 == 0))
+      continue;
+    float lx = p0.x + (float)x * zoom;
+    drawList->AddLine(ImVec2(lx, p0.y), ImVec2(lx, p1.y), color);
+  }
+  for (int y = 0; y <= texH; ++y) {
+    if (skipTileLines && (y % 32 == 0))
+      continue;
+    float ly = p0.y + (float)y * zoom;
+    drawList->AddLine(ImVec2(p0.x, ly), ImVec2(p1.x, ly), color);
+  }
+}
+
+void TextureGridWidget::DrawTileGrid(ImDrawList *drawList, ImVec2 p0, ImVec2 p1,
+                                     int texW, int texH, float zoom,
+                                     int tileSize, ImU32 color,
+                                     float thickness) {
+  if (!drawList || texW <= 0 || texH <= 0 || tileSize <= 0)
+    return;
+
+  for (int x = tileSize; x < texW; x += tileSize) {
+    float lx = p0.x + (float)x * zoom;
+    drawList->AddLine(ImVec2(lx, p0.y), ImVec2(lx, p1.y), color, thickness);
+  }
+  for (int y = tileSize; y < texH; y += tileSize) {
+    float ly = p0.y + (float)y * zoom;
+    drawList->AddLine(ImVec2(p0.x, ly), ImVec2(p1.x, ly), color, thickness);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TextureInspectorWidget Implementation
+// -----------------------------------------------------------------------------
+
+void TextureInspectorWidget::DrawPixelTileTooltip(int px, int py, int texWidth,
+                                                  int tileSize) {
+  ImGui::BeginTooltip();
+  ImGui::Text("Pixel: (%d, %d)", px, py);
+  int tileX = 0, tileY = 0, tileIdx = 0;
+  TextureCanvasWidget::PixelToTileCoords(px, py, tileX, tileY, tileIdx,
+                                        texWidth, tileSize);
+  ImGui::Text("Tile (%dx%d): [%d, %d] (#%d)", tileSize, tileSize, tileX, tileY,
+              tileIdx);
+  ImGui::EndTooltip();
 }

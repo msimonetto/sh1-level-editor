@@ -94,6 +94,11 @@ public:
   void RebuildChunkBatches(const std::string &chunkName,
                            const std::string &workspaceDir);
 
+  // Rebuild GPU batches for all chunks in the scene referencing a texture name
+  void RebuildChunksUsingTexture(const std::string &texName,
+                                 const std::string &workspaceDir,
+                                 Viewport &sceneViewport);
+
   int m_moveStepPower = 4;
   bool m_autoValidate = true;
 
