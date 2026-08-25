@@ -20,4 +20,3 @@ public:
   void Draw(Viewport &viewport,
             LocalGeometryOverlay *localGeometryOverlay = nullptr);
 };
-

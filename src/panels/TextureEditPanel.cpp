@@ -11,7 +11,7 @@
 #include <filesystem>
 
 void TextureEditPanel::DrawFromFileControls(
-    Textures &testTexture, int &currentPalette, RenderFace *activeFace,
+    Textures &activeTexture, int &currentPalette, RenderFace *activeFace,
     RenderMesh *activeMesh, FileManager &fileManager, Viewport &sceneViewport,
     LocalGeometryOverlay &localGeometryOverlay, History &history) {
   float labelWidth = 110.0f;
@@ -29,8 +29,9 @@ void TextureEditPanel::DrawFromFileControls(
     if (path.empty()) return;
     Config::Get().LastTexturePath = path;
     Config::Get().Save();
-    if (testTexture.Load(Config::Get().LastTexturePath)) {
+    if (activeTexture.Load(Config::Get().LastTexturePath)) {
       currentPalette = 0;
+      activeTexture.ApplyPalette(currentPalette);
 
       if (activeFace && activeMesh) {
         RenderMesh snapBefore = *activeMesh;
@@ -90,18 +91,18 @@ void TextureEditPanel::DrawFromFileControls(
   }
 }
 
-bool TextureEditPanel::Draw(Textures& testTexture, RenderFace* activeFace, RenderMesh* activeMesh, bool snapToGrid, RenderMesh& outSnapBefore, ImVec2& outMinUV, ImVec2& outMaxUV) {
+bool TextureEditPanel::Draw(Textures& activeTexture, RenderFace* activeFace, RenderMesh* activeMesh, bool snapToGrid, RenderMesh& outSnapBefore, ImVec2& outMinUV, ImVec2& outMaxUV) {
     bool uvsModified = false;
 
     float availWidth = ImGui::GetContentRegionAvail().x;
     float textureScale = (availWidth > 0.0f) ? (availWidth / 256.0f) : 1.0f;
 
     ImVec2 imgPos = ImGui::GetCursorScreenPos();
-    float imgW = (float)testTexture.GetWidth() * textureScale;
-    float imgH = (float)testTexture.GetHeight() * textureScale;
+    float imgW = (float)activeTexture.GetWidth() * textureScale;
+    float imgH = (float)activeTexture.GetHeight() * textureScale;
 
     // Render the Raylib texture in ImGui
-    ImGui::Image((ImTextureID)(intptr_t)testTexture.GetTexture().id, ImVec2(imgW, imgH));
+    ImGui::Image((ImTextureID)(intptr_t)activeTexture.GetTexture().id, ImVec2(imgW, imgH));
 
     if (ImGui::BeginPopupContextItem("TextureEditContextMenu")) {
         if (ImGui::MenuItem("Reset UV to Original")) {}

@@ -85,8 +85,20 @@ Maintains bidirectional asset relationship indexes via `dependencies.json` and `
   - `Load()`, `Save()`: Loads/writes JSON dependency graphs.
   - `LoadIPDDependencies(prefix, ipdNames)`: Resolves active TIM textures and PLM models for selected chunks.
   - `GetActiveTextures()`, `GetActivePLMs()`: Set accessors for active workspace dependencies.
+  - `GetTexturesForChunks(chunkNames)`: Queries required texture dependencies for a specific subset of chunks.
+  - `GetSharedFiles(excludeChunks)`: Computes files shared with other chunks outside the exclusion list.
   - `m_dependencies`: Prefix $\rightarrow$ (Asset Name $\rightarrow$ Required Dependencies).
   - `m_dependents`: Prefix $\rightarrow$ (Asset Name $\rightarrow$ Dependent Chunks/Files).
+
+### `ResourceFilter.h`
+Reusable multi-scope asset query engine decoupled from disk file I/O and UI logic.
+- **`ResourceFilter`**:
+  - `GetAssetTextures(fileManager, prefixFilter)`: Discovers all TIM textures from extracted game assets (`assets/BG/`, `assets/TIM/`).
+  - `GetWorkspaceTextures(fileManager, prefixFilter)`: Discovers TIM textures residing in the active workspace (`workspace/TIM/`).
+  - `GetSelectedChunksTextures(fileManager, depManager, prefixFilter)`: Resolves textures required by all multi-selected chunks.
+  - `GetChunkTextures(chunk, prefixFilter)`: Collects local and global texture names for a specific parsed chunk.
+  - `GetMeshTextures(mesh, chunk, obj, prefixFilter)`: Collects textures actively mapped to faces on a specific mesh.
+  - `ResolveTexturePath(fileManager, texName)`: Locates the physical file path of a texture across workspace and asset directories.
 
 ### `Dictionary.h`
 Manages human-readable aliases and prefix designations via `dictionary.json`.

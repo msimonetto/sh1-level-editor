@@ -19,7 +19,7 @@ class Viewport;
 
 class TextureMapPanel {
 public:
-  void Draw(Textures &testTexture, int &currentPalette,
+  void Draw(Textures &activeTexture, int &currentPalette,
             FileManager &fileManager, DependencyManager &dependencyManager,
             Viewport &sceneViewport, LocalGeometryOverlay &localGeometryOverlay,
             History &history);
@@ -40,10 +40,23 @@ public:
     }
   };
 
+  enum class TextureFilterScope {
+    Assets = 0,
+    Workspace,
+    SelectedChunks,
+    CurrentChunk,
+    CurrentMesh,
+    Count
+  };
+
   bool IsTilePaintModeActive() const { return m_tilePaintModeActive; }
   const SelectedTile &GetCurrentTile() const { return m_currentTile; }
+  TextureFilterScope GetFilterScope() const { return m_filterScope; }
+  void SetFilterScope(TextureFilterScope scope) { m_filterScope = scope; }
 
 private:
+  TextureFilterScope m_filterScope = TextureFilterScope::Workspace;
+
   // Selection state tracking
   std::string lastSelChunk;
   int lastSelObj = -1;
@@ -51,8 +64,11 @@ private:
   int lastSelFace = -1;
 
   // Texture cache state
+  TextureFilterScope lastFilterScope = TextureFilterScope::Count;
   std::string lastWorkspaceDirForTex;
+  std::string lastAssetsDirForTex;
   std::string lastSelectedPrefixForTex;
+  std::vector<std::string> lastSelectedChunksForTex;
   std::set<std::string> lastActiveTextures;
   std::vector<std::string> cachedTextures;
   double lastTexRefreshTime = 0.0;
@@ -74,12 +90,13 @@ private:
   void SaveRecentTiles(const std::string &workspaceDir);
 
   void SyncSelectionState(LocalGeometryOverlay &localGeometryOverlay,
-                          FileManager &fileManager, Textures &testTexture,
+                          FileManager &fileManager, Textures &activeTexture,
                           int &currentPalette, RenderFace *&activeFace,
                           RenderMesh *&activeMesh, std::string *&activeObjName);
 
   void RefreshAvailableTextures(FileManager &fileManager,
-                                DependencyManager &dependencyManager);
+                                DependencyManager &dependencyManager,
+                                LocalGeometryOverlay &localGeometryOverlay);
 
   void ApplyFaceMutation(
       LocalGeometryOverlay &localGeometryOverlay, Viewport &sceneViewport,
@@ -89,24 +106,24 @@ private:
           &fn,
       const std::string &desc);
 
-  void DrawTextureSelector(Textures &testTexture, int &currentPalette,
+  void DrawTextureSelector(Textures &activeTexture, int &currentPalette,
                            FileManager &fileManager, Viewport &sceneViewport,
                            LocalGeometryOverlay &localGeometryOverlay,
                            History &history, RenderFace *activeFace,
                            RenderMesh *activeMesh, std::string *activeObjName);
 
-  void DrawPaletteControls(Textures &testTexture, int &currentPalette,
+  void DrawPaletteControls(Textures &activeTexture, int &currentPalette,
                            FileManager &fileManager, Viewport &sceneViewport,
                            LocalGeometryOverlay &localGeometryOverlay,
                            History &history, RenderFace *activeFace,
                            RenderMesh *activeMesh, std::string *activeObjName);
 
-  void DrawUVCanvas(Textures &testTexture, int &currentPalette,
+  void DrawUVCanvas(Textures &activeTexture, int &currentPalette,
                     FileManager &fileManager, Viewport &sceneViewport,
                     LocalGeometryOverlay &localGeometryOverlay, History &history,
                     RenderFace *activeFace, RenderMesh *activeMesh,
                     std::string *activeObjName);
 
-  void DrawRecentTilesGrid(Textures &testTexture, int &currentPalette,
+  void DrawRecentTilesGrid(Textures &activeTexture, int &currentPalette,
                            FileManager &fileManager);
 };

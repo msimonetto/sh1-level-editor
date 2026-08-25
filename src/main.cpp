@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
     ImGui::GetStyle().ScaleAllSizes(2.0f);
   }
 
-  Textures testTexture;
+  Textures activeTexture;
   Config::Get().LastTexturePath = ""; // User requested empty panel on startup
   Config::Get().Save(); // Remove from config.json on startup
 
@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
     // Our Windows
     // ----------------------------------------------------------------
 
-    textureWindow.Draw(testTexture, currentPalette, fileManager, dependencyManager,
+    textureWindow.Draw(activeTexture, currentPalette, fileManager, dependencyManager,
                        viewport, localGeometryOverlay, history);
 
     viewport.SetActiveMode(viewportToolsPanel.GetActiveMode());

@@ -143,3 +143,34 @@ std::set<std::string> DependencyManager::GetSharedFiles(const std::vector<std::s
     }
     return shared;
 }
+
+std::set<std::string> DependencyManager::GetTexturesForChunks(const std::vector<std::string>& chunkNames) const {
+    std::set<std::string> textures;
+    for (const auto& ipdName : chunkNames) {
+        std::string chunkKey = ipdName;
+        if (chunkKey.length() > 4 && chunkKey.substr(chunkKey.length() - 4) == ".IPD") {
+            chunkKey = chunkKey.substr(0, chunkKey.length() - 4);
+        } else if (chunkKey.length() > 4 && chunkKey.substr(chunkKey.length() - 4) == ".ipd") {
+            chunkKey = chunkKey.substr(0, chunkKey.length() - 4);
+        }
+
+        auto it = m_dependenciesData.find(chunkKey);
+        if (it != m_dependenciesData.end()) {
+            const auto& chunkData = it->second;
+            if (chunkData.contains("textures")) {
+                for (const auto& tex : chunkData["textures"]) {
+                    std::string texName = tex.get<std::string>();
+                    if (texName.length() > 4 && texName.substr(texName.length() - 4) == ".TIM") {
+                        textures.insert(texName.substr(0, texName.length() - 4));
+                    } else if (texName.length() > 4 && texName.substr(texName.length() - 4) == ".tim") {
+                        textures.insert(texName.substr(0, texName.length() - 4));
+                    } else {
+                        textures.insert(texName);
+                    }
+                }
+            }
+        }
+    }
+    return textures;
+}
+

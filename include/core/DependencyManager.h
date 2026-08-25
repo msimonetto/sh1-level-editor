@@ -29,6 +29,9 @@ public:
     // Check if a file is shared among other chunks
     std::set<std::string> GetSharedFiles(const std::vector<std::string>& excludeChunks) const;
 
+    // Get texture dependencies for a specific list of chunks
+    std::set<std::string> GetTexturesForChunks(const std::vector<std::string>& chunkNames) const;
+
     std::map<std::string, nlohmann::json> m_dependenciesData; // chunkName -> json object
 
 private:

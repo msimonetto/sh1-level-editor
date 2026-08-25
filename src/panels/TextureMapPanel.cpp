@@ -8,6 +8,7 @@
 #include "formats/IPDWrite.h"
 #include "imgui_internal.h"
 #include "extras/IconsFontAwesome6.h"
+#include "core/ResourceFilter.h"
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -146,7 +147,7 @@ void TextureMapPanel::EnsureRecentTilesLoaded(const std::string &workspaceDir) {
 
 void TextureMapPanel::SyncSelectionState(
     LocalGeometryOverlay &localGeometryOverlay, FileManager &fileManager,
-    Textures &testTexture, int &currentPalette, RenderFace *&activeFace,
+    Textures &activeTexture, int &currentPalette, RenderFace *&activeFace,
     RenderMesh *&activeMesh, std::string *&activeObjName) {
   activeFace = nullptr;
   activeMesh = nullptr;
@@ -188,15 +189,15 @@ void TextureMapPanel::SyncSelectionState(
       std::string path = fileManager.GetWorkspaceDir() + "/TIM/" +
                          activeFace->texName + ".TIM";
       if (path != Config::Get().LastTexturePath) {
-        if (testTexture.Load(path)) {
+        if (activeTexture.Load(path)) {
           Config::Get().LastTexturePath = path;
           Config::Get().Save();
           currentPalette = activeFace->paletteRow;
-          testTexture.ApplyPalette(currentPalette);
+          activeTexture.ApplyPalette(currentPalette);
         }
-      } else if (testTexture.GetTexture().id != 0) {
+      } else if (activeTexture.GetTexture().id != 0) {
         currentPalette = activeFace->paletteRow;
-        testTexture.ApplyPalette(currentPalette);
+        activeTexture.ApplyPalette(currentPalette);
       }
 
       float minU = activeFace->uv[0][0];
@@ -226,36 +227,88 @@ void TextureMapPanel::SyncSelectionState(
 }
 
 void TextureMapPanel::RefreshAvailableTextures(
-    FileManager &fileManager, DependencyManager &dependencyManager) {
+    FileManager &fileManager, DependencyManager &dependencyManager,
+    LocalGeometryOverlay &localGeometryOverlay) {
   std::string currentWorkspaceDir = fileManager.GetWorkspaceDir();
+  std::string currentAssetsDir = fileManager.GetAssetsDir();
   std::string currentPrefix = fileManager.GetSelectedPrefix();
-  const auto &activeDeps = dependencyManager.GetActiveTextures();
+  std::vector<std::string> currentSelChunks = fileManager.GetSelectedChunks();
+  std::string currentSelChunk = localGeometryOverlay.m_selectedChunk;
+  int currentSelObj = localGeometryOverlay.m_selectedObjectIdx;
+  int currentSelMesh = localGeometryOverlay.m_selectedMeshIdx;
 
-  if (currentWorkspaceDir != lastWorkspaceDirForTex ||
-      currentPrefix != lastSelectedPrefixForTex ||
-      activeDeps != lastActiveTextures ||
-      ImGui::GetTime() - lastTexRefreshTime > 1.0) {
+  bool needRefresh =
+      (m_filterScope != lastFilterScope) ||
+      (currentWorkspaceDir != lastWorkspaceDirForTex) ||
+      (currentAssetsDir != lastAssetsDirForTex) ||
+      (currentPrefix != lastSelectedPrefixForTex) ||
+      (currentSelChunks != lastSelectedChunksForTex) ||
+      (currentSelChunk != lastSelChunk) ||
+      (currentSelObj != lastSelObj) ||
+      (currentSelMesh != lastSelMesh) ||
+      (ImGui::GetTime() - lastTexRefreshTime > 1.0);
+
+  if (needRefresh) {
+    lastFilterScope = m_filterScope;
     lastWorkspaceDirForTex = currentWorkspaceDir;
+    lastAssetsDirForTex = currentAssetsDir;
     lastSelectedPrefixForTex = currentPrefix;
-    lastActiveTextures = activeDeps;
+    lastSelectedChunksForTex = currentSelChunks;
+    lastSelChunk = currentSelChunk;
+    lastSelObj = currentSelObj;
+    lastSelMesh = currentSelMesh;
     lastTexRefreshTime = ImGui::GetTime();
+
     cachedTextures.clear();
 
-    std::string texDir = currentWorkspaceDir + "/TIM/";
-    if (std::filesystem::exists(texDir) && std::filesystem::is_directory(texDir)) {
-      for (const auto &entry : std::filesystem::directory_iterator(texDir)) {
-        if (entry.is_regular_file()) {
-          std::string ext = entry.path().extension().string();
-          std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-          if (ext == ".tim") {
-            std::string stem = entry.path().stem().string();
-            if (currentPrefix.empty() || stem.find(currentPrefix) == 0) {
-              cachedTextures.push_back(stem);
-            }
-          }
+    switch (m_filterScope) {
+    case TextureFilterScope::Assets:
+      cachedTextures =
+          ResourceFilter::GetAssetTextures(fileManager, currentPrefix);
+      break;
+    case TextureFilterScope::Workspace:
+      cachedTextures =
+          ResourceFilter::GetWorkspaceTextures(fileManager, currentPrefix);
+      break;
+    case TextureFilterScope::SelectedChunks:
+      cachedTextures = ResourceFilter::GetSelectedChunksTextures(
+          fileManager, dependencyManager, currentPrefix);
+      break;
+    case TextureFilterScope::CurrentChunk: {
+      const ParsedChunk *chunkData = nullptr;
+      for (const auto &lc : localGeometryOverlay.GetChunks()) {
+        if (lc.data && lc.data->chunkName == currentSelChunk) {
+          chunkData = lc.data.get();
+          break;
         }
       }
-      std::sort(cachedTextures.begin(), cachedTextures.end());
+      cachedTextures =
+          ResourceFilter::GetChunkTextures(chunkData, currentPrefix);
+      break;
+    }
+    case TextureFilterScope::CurrentMesh: {
+      const ParsedChunk *chunkData = nullptr;
+      for (const auto &lc : localGeometryOverlay.GetChunks()) {
+        if (lc.data && lc.data->chunkName == currentSelChunk) {
+          chunkData = lc.data.get();
+          break;
+        }
+      }
+      const RenderMesh *mesh = nullptr;
+      const RenderObject *obj = nullptr;
+      if (chunkData && currentSelObj >= 0 &&
+          currentSelObj < (int)chunkData->objects.size()) {
+        obj = &chunkData->objects[currentSelObj];
+        if (currentSelMesh >= 0 && currentSelMesh < (int)obj->meshes.size()) {
+          mesh = &obj->meshes[currentSelMesh];
+        }
+      }
+      cachedTextures =
+          ResourceFilter::GetMeshTextures(mesh, chunkData, obj, currentPrefix);
+      break;
+    }
+    default:
+      break;
     }
   }
 }
@@ -341,11 +394,40 @@ void TextureMapPanel::ApplyFaceMutation(
 }
 
 void TextureMapPanel::DrawTextureSelector(
-    Textures &testTexture, int &currentPalette, FileManager &fileManager,
+    Textures &activeTexture, int &currentPalette, FileManager &fileManager,
     Viewport &sceneViewport, LocalGeometryOverlay &localGeometryOverlay,
     History &history, RenderFace *activeFace, RenderMesh *activeMesh,
     std::string *activeObjName) {
 
+  const char *filterScopeNames[] = {
+      "Assets",
+      "Workspace",
+      "Selected Chunks",
+      "Current Chunk",
+      "Current Mesh"
+  };
+
+  float filterBtnWidth = ImGui::GetFrameHeight();
+  ImGui::SetNextItemWidth(filterBtnWidth);
+  if (ImGui::BeginCombo("##TexFilterScope", ICON_FA_FILTER,
+                        ImGuiComboFlags_NoArrowButton)) {
+    for (int i = 0; i < static_cast<int>(TextureFilterScope::Count); ++i) {
+      bool isSelected = (m_filterScope == static_cast<TextureFilterScope>(i));
+      if (ImGui::Selectable(filterScopeNames[i], isSelected)) {
+        m_filterScope = static_cast<TextureFilterScope>(i);
+      }
+      if (isSelected) {
+        ImGui::SetItemDefaultFocus();
+      }
+    }
+    ImGui::EndCombo();
+  }
+  if (ImGui::IsItemHovered()) {
+    ImGui::SetTooltip("Filter Textures: %s",
+                      filterScopeNames[static_cast<int>(m_filterScope)]);
+  }
+
+  ImGui::SameLine();
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
   std::string currentTexName = "Select a face or texture...";
   if (!Config::Get().LastTexturePath.empty()) {
@@ -354,7 +436,38 @@ void TextureMapPanel::DrawTextureSelector(
   }
 
   if (cachedTextures.empty()) {
-    if (ImGui::BeginCombo("##TIM_Sel", "No textures found in workspace")) {
+    std::string placeholder;
+    std::string currentPrefix = fileManager.GetSelectedPrefix();
+    switch (m_filterScope) {
+    case TextureFilterScope::Assets:
+      placeholder = currentPrefix.empty()
+                        ? "No textures found in assets"
+                        : "No " + currentPrefix + " textures in assets";
+      break;
+    case TextureFilterScope::Workspace:
+      placeholder = currentPrefix.empty()
+                        ? "No textures found in workspace"
+                        : "No " + currentPrefix + " textures in workspace";
+      break;
+    case TextureFilterScope::SelectedChunks:
+      placeholder = "No textures in selected chunks";
+      break;
+    case TextureFilterScope::CurrentChunk:
+      placeholder = localGeometryOverlay.m_selectedChunk.empty()
+                        ? "No chunk selected in viewport"
+                        : "No textures in chunk " +
+                              localGeometryOverlay.m_selectedChunk;
+      break;
+    case TextureFilterScope::CurrentMesh:
+      placeholder = (localGeometryOverlay.m_selectedMeshIdx < 0)
+                        ? "No mesh selected in viewport"
+                        : "No textures in current mesh";
+      break;
+    default:
+      placeholder = "No textures found";
+      break;
+    }
+    if (ImGui::BeginCombo("##TIM_Sel", placeholder.c_str())) {
       ImGui::EndCombo();
     }
   } else {
@@ -362,11 +475,15 @@ void TextureMapPanel::DrawTextureSelector(
       for (const auto &tex : cachedTextures) {
         if (ImGui::Selectable(tex.c_str())) {
           std::string path =
-              fileManager.GetWorkspaceDir() + "/TIM/" + tex + ".TIM";
-          if (testTexture.Load(path)) {
+              ResourceFilter::ResolveTexturePath(fileManager, tex);
+          if (!path.empty() && activeTexture.Load(path)) {
             Config::Get().LastTexturePath = path;
             Config::Get().Save();
             currentPalette = 0;
+            activeTexture.ApplyPalette(currentPalette);
+
+            m_currentTile.texName = tex;
+            m_currentTile.palette = 0;
 
             ApplyFaceMutation(
                 localGeometryOverlay, sceneViewport, fileManager, history,
@@ -395,20 +512,20 @@ void TextureMapPanel::DrawTextureSelector(
 }
 
 void TextureMapPanel::DrawPaletteControls(
-    Textures &testTexture, int &currentPalette, FileManager &fileManager,
+    Textures &activeTexture, int &currentPalette, FileManager &fileManager,
     Viewport &sceneViewport, LocalGeometryOverlay &localGeometryOverlay,
     History &history, RenderFace *activeFace, RenderMesh *activeMesh,
     std::string *activeObjName) {
-  ImGui::Text("Size: %d x %d", testTexture.GetWidth(), testTexture.GetHeight());
+  ImGui::Text("Size: %d x %d", activeTexture.GetWidth(), activeTexture.GetHeight());
 
-  int numPalettes = (int)testTexture.GetPalettes().size();
+  int numPalettes = (int)activeTexture.GetPalettes().size();
   if (numPalettes >= 1) {
     auto applyNewPalette = [&](int newPal) {
       if (numPalettes <= 0) return;
       newPal = (newPal % numPalettes + numPalettes) % numPalettes;
       if (newPal == currentPalette) return;
       currentPalette = newPal;
-      testTexture.ApplyPalette(currentPalette);
+      activeTexture.ApplyPalette(currentPalette);
 
       ApplyFaceMutation(
           localGeometryOverlay, sceneViewport, fileManager, history,
@@ -419,7 +536,7 @@ void TextureMapPanel::DrawPaletteControls(
           "Change palette to row " + std::to_string(currentPalette));
     };
 
-    ImGui::Text("Palette:");
+    ImGui::Text("CLUT Row:");
     ImGui::SameLine();
 
     float btnW = 22.0f;
@@ -462,7 +579,7 @@ void TextureMapPanel::DrawPaletteControls(
             isSelected ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 200, 200, 255),
             numLabel.c_str());
 
-        const auto &rowPal = testTexture.GetPalettes()[i];
+        const auto &rowPal = activeTexture.GetPalettes()[i];
         if (!rowPal.colors.empty()) {
           float barX = itemPos.x + labelW;
           float barW = itemW - labelW - 4.0f;
@@ -505,10 +622,10 @@ void TextureMapPanel::DrawPaletteControls(
     if (!canStep) ImGui::EndDisabled();
   }
 
-  if (!testTexture.GetPalettes().empty()) {
+  if (!activeTexture.GetPalettes().empty()) {
     int palIdx =
-        std::clamp(currentPalette, 0, (int)testTexture.GetPalettes().size() - 1);
-    const auto &pal = testTexture.GetPalettes()[palIdx];
+        std::clamp(currentPalette, 0, (int)activeTexture.GetPalettes().size() - 1);
+    const auto &pal = activeTexture.GetPalettes()[palIdx];
     if (!pal.colors.empty()) {
       float availWidth = ImGui::GetContentRegionAvail().x;
       float barHeight = 16.0f;
@@ -573,11 +690,11 @@ void TextureMapPanel::DrawPaletteControls(
 }
 
 void TextureMapPanel::DrawUVCanvas(
-    Textures &testTexture, int &currentPalette, FileManager &fileManager,
+    Textures &activeTexture, int &currentPalette, FileManager &fileManager,
     Viewport &sceneViewport, LocalGeometryOverlay &localGeometryOverlay,
     History &history, RenderFace *activeFace, RenderMesh *activeMesh,
     std::string *activeObjName) {
-  if (testTexture.GetTexture().id == 0)
+  if (activeTexture.GetTexture().id == 0)
     return;
 
   ImGui::Separator();
@@ -585,7 +702,7 @@ void TextureMapPanel::DrawUVCanvas(
 
   ImVec2 minUV, maxUV;
   RenderMesh snapBefore;
-  if (m_canvas.Draw(testTexture, activeFace, activeMesh, snapToGrid,
+  if (m_canvas.Draw(activeTexture, activeFace, activeMesh, snapToGrid,
                     snapBefore, minUV, maxUV)) {
       m_currentTile.minU = minUV.x;
       m_currentTile.minV = minUV.y;
@@ -616,7 +733,7 @@ void TextureMapPanel::DrawUVCanvas(
 }
 
 void TextureMapPanel::DrawRecentTilesGrid(
-    Textures &testTexture, int &currentPalette, FileManager &fileManager) {
+    Textures &activeTexture, int &currentPalette, FileManager &fileManager) {
   ImGui::Separator();
 
   ImGui::Text("Recent Tiles Cache:");
@@ -715,15 +832,17 @@ void TextureMapPanel::DrawRecentTilesGrid(
       m_currentTile = t;
       std::string expectedPath =
           fileManager.GetWorkspaceDir() + "/TIM/" + t.texName + ".TIM";
-      if (Config::Get().LastTexturePath != expectedPath) {
-        if (testTexture.Load(expectedPath)) {
+      bool loadedNew = false;
+      if (Config::Get().LastTexturePath != expectedPath || activeTexture.GetTexture().id == 0) {
+        if (activeTexture.Load(expectedPath)) {
           Config::Get().LastTexturePath = expectedPath;
           Config::Get().Save();
+          loadedNew = true;
         }
       }
-      if (currentPalette != t.palette) {
+      if (currentPalette != t.palette || loadedNew) {
         currentPalette = t.palette;
-        testTexture.ApplyPalette(currentPalette);
+        activeTexture.ApplyPalette(currentPalette);
       }
     }
 
@@ -767,7 +886,7 @@ void TextureMapPanel::DrawRecentTilesGrid(
   ImGui::PopStyleVar(3);
 }
 
-void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
+void TextureMapPanel::Draw(Textures &activeTexture, int &currentPalette,
                            FileManager &fileManager,
                            DependencyManager &dependencyManager,
                            Viewport &sceneViewport,
@@ -779,10 +898,10 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
   RenderMesh *activeMesh = nullptr;
   std::string *activeObjName = nullptr;
 
-  SyncSelectionState(localGeometryOverlay, fileManager, testTexture,
+  SyncSelectionState(localGeometryOverlay, fileManager, activeTexture,
                      currentPalette, activeFace, activeMesh, activeObjName);
 
-  RefreshAvailableTextures(fileManager, dependencyManager);
+  RefreshAvailableTextures(fileManager, dependencyManager, localGeometryOverlay);
 
   ImGui::SetNextWindowSizeConstraints(ImVec2(350, 400),
                                       ImVec2(FLT_MAX, FLT_MAX));
@@ -791,16 +910,16 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     return;
   }
 
-  DrawTextureSelector(testTexture, currentPalette, fileManager, sceneViewport,
+  DrawTextureSelector(activeTexture, currentPalette, fileManager, sceneViewport,
                       localGeometryOverlay, history, activeFace, activeMesh,
                       activeObjName);
 
-  if (testTexture.GetTexture().id != 0) {
+  if (activeTexture.GetTexture().id != 0) {
     ImGui::Separator();
-    DrawPaletteControls(testTexture, currentPalette, fileManager, sceneViewport,
+    DrawPaletteControls(activeTexture, currentPalette, fileManager, sceneViewport,
                         localGeometryOverlay, history, activeFace, activeMesh,
                         activeObjName);
-    DrawUVCanvas(testTexture, currentPalette, fileManager, sceneViewport,
+    DrawUVCanvas(activeTexture, currentPalette, fileManager, sceneViewport,
                  localGeometryOverlay, history, activeFace, activeMesh,
                  activeObjName);
   } else {
@@ -808,7 +927,7 @@ void TextureMapPanel::Draw(Textures &testTexture, int &currentPalette,
     ImGui::TextDisabled("No TIM texture file selected.");
   }
 
-  DrawRecentTilesGrid(testTexture, currentPalette, fileManager);
+  DrawRecentTilesGrid(activeTexture, currentPalette, fileManager);
 
   ImGui::End();
 }

@@ -15,7 +15,7 @@ public:
     TextureEditPanel() = default;
 
     // Draws the "From file:" text box and "Browse..." file dialog button.
-    void DrawFromFileControls(Textures &testTexture, int &currentPalette,
+    void DrawFromFileControls(Textures &activeTexture, int &currentPalette,
                               RenderFace *activeFace, RenderMesh *activeMesh,
                               FileManager &fileManager, Viewport &sceneViewport,
                               LocalGeometryOverlay &localGeometryOverlay, History &history);
@@ -24,7 +24,7 @@ public:
     // Returns true if the UVs were modified by a completed drag operation.
     // When true is returned, outSnapBefore will contain the mesh state before dragging,
     // outMinUV and outMaxUV will contain the new UV bounds.
-    bool Draw(Textures& testTexture, RenderFace* activeFace, RenderMesh* activeMesh, bool snapToGrid, RenderMesh& outSnapBefore, ImVec2& outMinUV, ImVec2& outMaxUV);
+    bool Draw(Textures& activeTexture, RenderFace* activeFace, RenderMesh* activeMesh, bool snapToGrid, RenderMesh& outSnapBefore, ImVec2& outMinUV, ImVec2& outMaxUV);
 
 private:
     bool m_isDraggingUV = false;
@@ -32,4 +32,3 @@ private:
     ImVec2 m_dragEndUV;
     RenderMesh m_dragStartMesh;
 };
-

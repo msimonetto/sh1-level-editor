@@ -11,4 +11,3 @@
 namespace MenuPanel {
     bool Draw(Shortcuts& shortcuts, FileManager& fileManager, Viewport& viewport, History& history, LocalGeometryOverlay& localGeometryOverlay, WaypointsOverlay& eventOverlay, SettingsPanel& settingsWindow);
 }
-
