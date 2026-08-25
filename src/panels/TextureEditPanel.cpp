@@ -1,6 +1,6 @@
 #include "panels/TextureEditPanel.h"
+#include "panels/TextureWidgets.h"
 #include "core/Config.h"
-#include "core/FileDialog.h"
 #include "core/FileManager.h"
 #include "core/History.h"
 #include "viewport/LocalGeometryOverlay.h"
@@ -14,18 +14,8 @@ void TextureEditPanel::DrawFromFileControls(
     Textures &activeTexture, int &currentPalette, RenderFace *activeFace,
     RenderMesh *activeMesh, FileManager &fileManager, Viewport &sceneViewport,
     LocalGeometryOverlay &localGeometryOverlay, History &history) {
-  float labelWidth = 110.0f;
-  float browseWidth = 80.0f;
-
-  ImGui::AlignTextToFramePadding();
-  ImGui::Text("From file:");
-  ImGui::SameLine(labelWidth);
-
-  char timPathBuf[256];
-  strncpy(timPathBuf, Config::Get().LastTexturePath.c_str(), sizeof(timPathBuf));
-  timPathBuf[sizeof(timPathBuf) - 1] = '\0';
-
-  auto applyLoadedTexture = [&](const std::string &path) {
+  TextureSelectorWidget selector;
+  selector.DrawFromFile([&](const std::string &path, const std::string &tex) {
     if (path.empty()) return;
     Config::Get().LastTexturePath = path;
     Config::Get().Save();
@@ -35,8 +25,6 @@ void TextureEditPanel::DrawFromFileControls(
 
       if (activeFace && activeMesh) {
         RenderMesh snapBefore = *activeMesh;
-        std::string tex =
-            std::filesystem::path(Config::Get().LastTexturePath).stem().string();
         activeFace->texName = tex;
         activeFace->texNum = 0x7F;
 
@@ -73,20 +61,5 @@ void TextureEditPanel::DrawFromFileControls(
             fileManager.GetWorkspaceDir());
       }
     }
-  };
-
-  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - browseWidth -
-                          ImGui::GetStyle().ItemSpacing.x);
-  if (ImGui::InputText("##TIM_Path", timPathBuf, sizeof(timPathBuf),
-                       ImGuiInputTextFlags_EnterReturnsTrue)) {
-    applyLoadedTexture(timPathBuf);
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Browse...", ImVec2(browseWidth, 0))) {
-    std::string path =
-        FileDialog::OpenFile("TIM Files\0*.TIM;*.tim\0All Files\0*.*\0");
-    if (!path.empty()) {
-      applyLoadedTexture(path);
-    }
-  }
+  });
 }

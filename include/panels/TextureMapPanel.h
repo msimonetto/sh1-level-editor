@@ -7,6 +7,7 @@
 #include "raylib.h"
 #include "viewport/LocalGeometryOverlay.h"
 #include "viewport/SceneOverlay.h"
+#include "panels/TextureWidgets.h"
 #include <deque>
 #include <functional>
 #include <set>
@@ -39,38 +40,19 @@ public:
     }
   };
 
-  enum class TextureFilterScope {
-    Assets = 0,
-    Workspace,
-    SelectedChunks,
-    CurrentChunk,
-    CurrentMesh,
-    Count
-  };
-
   bool IsTilePaintModeActive() const { return m_tilePaintModeActive; }
   const SelectedTile &GetCurrentTile() const { return m_currentTile; }
-  TextureFilterScope GetFilterScope() const { return m_filterScope; }
-  void SetFilterScope(TextureFilterScope scope) { m_filterScope = scope; }
+  TextureFilterScope GetFilterScope() const { return m_textureSelector.GetFilterScope(); }
+  void SetFilterScope(TextureFilterScope scope) { m_textureSelector.SetFilterScope(scope); }
 
 private:
-  TextureFilterScope m_filterScope = TextureFilterScope::Workspace;
+  TextureSelectorWidget m_textureSelector;
 
   // Selection state tracking
   std::string lastSelChunk;
   int lastSelObj = -1;
   int lastSelMesh = -1;
   int lastSelFace = -1;
-
-  // Texture cache state
-  TextureFilterScope lastFilterScope = TextureFilterScope::Count;
-  std::string lastWorkspaceDirForTex;
-  std::string lastAssetsDirForTex;
-  std::string lastSelectedPrefixForTex;
-  std::vector<std::string> lastSelectedChunksForTex;
-  std::set<std::string> lastActiveTextures;
-  std::vector<std::string> cachedTextures;
-  double lastTexRefreshTime = 0.0;
 
   bool snapToGrid = true;
 

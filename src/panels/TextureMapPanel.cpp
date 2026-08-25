@@ -229,88 +229,16 @@ void TextureMapPanel::SyncSelectionState(
 void TextureMapPanel::RefreshAvailableTextures(
     FileManager &fileManager, DependencyManager &dependencyManager,
     LocalGeometryOverlay &localGeometryOverlay) {
-  std::string currentWorkspaceDir = fileManager.GetWorkspaceDir();
-  std::string currentAssetsDir = fileManager.GetAssetsDir();
-  std::string currentPrefix = fileManager.GetSelectedPrefix();
-  std::vector<std::string> currentSelChunks = fileManager.GetSelectedChunks();
-  std::string currentSelChunk = localGeometryOverlay.m_selectedChunk;
-  int currentSelObj = localGeometryOverlay.m_selectedObjectIdx;
-  int currentSelMesh = localGeometryOverlay.m_selectedMeshIdx;
-
-  bool needRefresh =
-      (m_filterScope != lastFilterScope) ||
-      (currentWorkspaceDir != lastWorkspaceDirForTex) ||
-      (currentAssetsDir != lastAssetsDirForTex) ||
-      (currentPrefix != lastSelectedPrefixForTex) ||
-      (currentSelChunks != lastSelectedChunksForTex) ||
-      (currentSelChunk != lastSelChunk) ||
-      (currentSelObj != lastSelObj) ||
-      (currentSelMesh != lastSelMesh) ||
-      (ImGui::GetTime() - lastTexRefreshTime > 1.0);
-
-  if (needRefresh) {
-    lastFilterScope = m_filterScope;
-    lastWorkspaceDirForTex = currentWorkspaceDir;
-    lastAssetsDirForTex = currentAssetsDir;
-    lastSelectedPrefixForTex = currentPrefix;
-    lastSelectedChunksForTex = currentSelChunks;
-    lastSelChunk = currentSelChunk;
-    lastSelObj = currentSelObj;
-    lastSelMesh = currentSelMesh;
-    lastTexRefreshTime = ImGui::GetTime();
-
-    cachedTextures.clear();
-
-    switch (m_filterScope) {
-    case TextureFilterScope::Assets:
-      cachedTextures =
-          ResourceFilter::GetAssetTextures(fileManager, currentPrefix);
-      break;
-    case TextureFilterScope::Workspace:
-      cachedTextures =
-          ResourceFilter::GetWorkspaceTextures(fileManager, currentPrefix);
-      break;
-    case TextureFilterScope::SelectedChunks:
-      cachedTextures = ResourceFilter::GetSelectedChunksTextures(
-          fileManager, dependencyManager, currentPrefix);
-      break;
-    case TextureFilterScope::CurrentChunk: {
-      const ParsedChunk *chunkData = nullptr;
-      for (const auto &lc : localGeometryOverlay.GetChunks()) {
-        if (lc.data && lc.data->chunkName == currentSelChunk) {
-          chunkData = lc.data.get();
-          break;
-        }
-      }
-      cachedTextures =
-          ResourceFilter::GetChunkTextures(chunkData, currentPrefix);
-      break;
-    }
-    case TextureFilterScope::CurrentMesh: {
-      const ParsedChunk *chunkData = nullptr;
-      for (const auto &lc : localGeometryOverlay.GetChunks()) {
-        if (lc.data && lc.data->chunkName == currentSelChunk) {
-          chunkData = lc.data.get();
-          break;
-        }
-      }
-      const RenderMesh *mesh = nullptr;
-      const RenderObject *obj = nullptr;
-      if (chunkData && currentSelObj >= 0 &&
-          currentSelObj < (int)chunkData->objects.size()) {
-        obj = &chunkData->objects[currentSelObj];
-        if (currentSelMesh >= 0 && currentSelMesh < (int)obj->meshes.size()) {
-          mesh = &obj->meshes[currentSelMesh];
-        }
-      }
-      cachedTextures =
-          ResourceFilter::GetMeshTextures(mesh, chunkData, obj, currentPrefix);
-      break;
-    }
-    default:
-      break;
+  std::vector<const ParsedChunk *> chunkPtrs;
+  for (const auto &lc : localGeometryOverlay.GetChunks()) {
+    if (lc.data) {
+      chunkPtrs.push_back(lc.data.get());
     }
   }
+  m_textureSelector.RefreshAvailable(
+      fileManager, dependencyManager, localGeometryOverlay.m_selectedChunk,
+      localGeometryOverlay.m_selectedObjectIdx,
+      localGeometryOverlay.m_selectedMeshIdx, chunkPtrs);
 }
 
 void TextureMapPanel::ApplyFaceMutation(
@@ -398,117 +326,38 @@ void TextureMapPanel::DrawTextureSelector(
     Viewport &sceneViewport, LocalGeometryOverlay &localGeometryOverlay,
     History &history, RenderFace *activeFace, RenderMesh *activeMesh,
     std::string *activeObjName) {
+  m_textureSelector.DrawCombo(
+      fileManager, Config::Get().LastTexturePath,
+      [&](const std::string &path, const std::string &tex) {
+        if (!path.empty() && activeTexture.Load(path)) {
+          Config::Get().LastTexturePath = path;
+          Config::Get().Save();
+          currentPalette = 0;
+          activeTexture.ApplyPalette(currentPalette);
 
-  const char *filterScopeNames[] = {
-      "Assets",
-      "Workspace",
-      "Selected Chunks",
-      "Current Chunk",
-      "Current Mesh"
-  };
+          m_currentTile.texName = tex;
+          m_currentTile.palette = 0;
 
-  float filterBtnWidth = ImGui::GetFrameHeight();
-  ImGui::SetNextItemWidth(filterBtnWidth);
-  if (ImGui::BeginCombo("##TexFilterScope", ICON_FA_FILTER,
-                        ImGuiComboFlags_NoArrowButton)) {
-    for (int i = 0; i < static_cast<int>(TextureFilterScope::Count); ++i) {
-      bool isSelected = (m_filterScope == static_cast<TextureFilterScope>(i));
-      if (ImGui::Selectable(filterScopeNames[i], isSelected)) {
-        m_filterScope = static_cast<TextureFilterScope>(i);
-      }
-      if (isSelected) {
-        ImGui::SetItemDefaultFocus();
-      }
-    }
-    ImGui::EndCombo();
-  }
-  if (ImGui::IsItemHovered()) {
-    ImGui::SetTooltip("Filter Textures: %s",
-                      filterScopeNames[static_cast<int>(m_filterScope)]);
-  }
-
-  ImGui::SameLine();
-  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-  std::string currentTexName = "Select a face or texture...";
-  if (!Config::Get().LastTexturePath.empty()) {
-    currentTexName =
-        std::filesystem::path(Config::Get().LastTexturePath).stem().string();
-  }
-
-  if (cachedTextures.empty()) {
-    std::string placeholder;
-    std::string currentPrefix = fileManager.GetSelectedPrefix();
-    switch (m_filterScope) {
-    case TextureFilterScope::Assets:
-      placeholder = currentPrefix.empty()
-                        ? "No textures found in assets"
-                        : "No " + currentPrefix + " textures in assets";
-      break;
-    case TextureFilterScope::Workspace:
-      placeholder = currentPrefix.empty()
-                        ? "No textures found in workspace"
-                        : "No " + currentPrefix + " textures in workspace";
-      break;
-    case TextureFilterScope::SelectedChunks:
-      placeholder = "No textures in selected chunks";
-      break;
-    case TextureFilterScope::CurrentChunk:
-      placeholder = localGeometryOverlay.m_selectedChunk.empty()
-                        ? "No chunk selected in viewport"
-                        : "No textures in chunk " +
-                              localGeometryOverlay.m_selectedChunk;
-      break;
-    case TextureFilterScope::CurrentMesh:
-      placeholder = (localGeometryOverlay.m_selectedMeshIdx < 0)
-                        ? "No mesh selected in viewport"
-                        : "No textures in current mesh";
-      break;
-    default:
-      placeholder = "No textures found";
-      break;
-    }
-    if (ImGui::BeginCombo("##TIM_Sel", placeholder.c_str())) {
-      ImGui::EndCombo();
-    }
-  } else {
-    if (ImGui::BeginCombo("##TIM_Sel", currentTexName.c_str())) {
-      for (const auto &tex : cachedTextures) {
-        if (ImGui::Selectable(tex.c_str())) {
-          std::string path =
-              ResourceFilter::ResolveTexturePath(fileManager, tex);
-          if (!path.empty() && activeTexture.Load(path)) {
-            Config::Get().LastTexturePath = path;
-            Config::Get().Save();
-            currentPalette = 0;
-            activeTexture.ApplyPalette(currentPalette);
-
-            m_currentTile.texName = tex;
-            m_currentTile.palette = 0;
-
-            ApplyFaceMutation(
-                localGeometryOverlay, sceneViewport, fileManager, history,
-                activeFace, activeMesh, activeObjName,
-                [&](RenderFace &face, const ParsedChunk *cd, RenderObject &obj) {
-                  face.texName = tex;
-                  face.texNum = 0x7F;
-                  if (cd) {
-                    const auto &texList =
-                        obj.isGlobal ? cd->globalTexNames : cd->localTexNames;
-                    for (size_t i = 0; i < texList.size(); i++) {
-                      if (texList[i] == tex) {
-                        face.texNum = (uint8_t)i;
-                        break;
-                      }
+          ApplyFaceMutation(
+              localGeometryOverlay, sceneViewport, fileManager, history,
+              activeFace, activeMesh, activeObjName,
+              [&](RenderFace &face, const ParsedChunk *cd, RenderObject &obj) {
+                face.texName = tex;
+                face.texNum = 0x7F;
+                if (cd) {
+                  const auto &texList =
+                      obj.isGlobal ? cd->globalTexNames : cd->localTexNames;
+                  for (size_t i = 0; i < texList.size(); i++) {
+                    if (texList[i] == tex) {
+                      face.texNum = (uint8_t)i;
+                      break;
                     }
                   }
-                },
-                "Change texture to " + tex);
-          }
+                }
+              },
+              "Change texture to " + tex);
         }
-      }
-      ImGui::EndCombo();
-    }
-  }
+      });
 }
 
 void TextureMapPanel::DrawPaletteControls(
@@ -516,177 +365,17 @@ void TextureMapPanel::DrawPaletteControls(
     Viewport &sceneViewport, LocalGeometryOverlay &localGeometryOverlay,
     History &history, RenderFace *activeFace, RenderMesh *activeMesh,
     std::string *activeObjName) {
-  ImGui::Text("Size: %d x %d", activeTexture.GetWidth(), activeTexture.GetHeight());
-
-  int numPalettes = (int)activeTexture.GetPalettes().size();
-  if (numPalettes >= 1) {
-    auto applyNewPalette = [&](int newPal) {
-      if (numPalettes <= 0) return;
-      newPal = (newPal % numPalettes + numPalettes) % numPalettes;
-      if (newPal == currentPalette) return;
-      currentPalette = newPal;
-      activeTexture.ApplyPalette(currentPalette);
-
-      ApplyFaceMutation(
-          localGeometryOverlay, sceneViewport, fileManager, history,
-          activeFace, activeMesh, activeObjName,
-          [&](RenderFace &face, const ParsedChunk *, RenderObject &) {
-            face.paletteRow = currentPalette;
-          },
-          "Change palette to row " + std::to_string(currentPalette));
-    };
-
-    ImGui::Text("CLUT Row:");
-    ImGui::SameLine();
-
-    float btnW = 22.0f;
-    float spacing = ImGui::GetStyle().ItemSpacing.x;
-    float comboW = ImGui::GetContentRegionAvail().x - (btnW * 2.0f + spacing * 2.0f);
-    if (comboW < 80.0f) comboW = 80.0f;
-
-    bool canStep = (numPalettes > 1);
-    if (!canStep) ImGui::BeginDisabled();
-    if (ImGui::ArrowButton("##PrevPal", ImGuiDir_Left)) {
-      applyNewPalette(currentPalette - 1);
-    }
-    if (!canStep) ImGui::EndDisabled();
-
-    ImGui::SameLine();
-
-    ImGui::SetNextItemWidth(comboW);
-    std::string comboPreview = std::to_string(currentPalette);
-    if (!canStep) ImGui::BeginDisabled();
-    if (ImGui::BeginCombo("##PaletteCombo", comboPreview.c_str(), ImGuiComboFlags_HeightLarge)) {
-      for (int i = 0; i < numPalettes; ++i) {
-        ImGui::PushID(i);
-        bool isSelected = (currentPalette == i);
-        ImVec2 itemPos = ImGui::GetCursorScreenPos();
-        float itemH = 18.0f;
-        float itemW = ImGui::GetContentRegionAvail().x;
-
-        if (ImGui::Selectable("##PalItem", isSelected, 0, ImVec2(0, itemH))) {
-          applyNewPalette(i);
-        }
-        if (isSelected) {
-          ImGui::SetItemDefaultFocus();
-        }
-
-        ImDrawList *drawList = ImGui::GetWindowDrawList();
-        std::string numLabel = std::to_string(i);
-        float labelW = 24.0f;
-        drawList->AddText(
-            ImVec2(itemPos.x + 4.0f, itemPos.y + 1.0f),
-            isSelected ? IM_COL32(255, 255, 255, 255) : IM_COL32(200, 200, 200, 255),
-            numLabel.c_str());
-
-        const auto &rowPal = activeTexture.GetPalettes()[i];
-        if (!rowPal.colors.empty()) {
-          float barX = itemPos.x + labelW;
-          float barW = itemW - labelW - 4.0f;
-          float barH = itemH - 4.0f;
-          float barY = itemPos.y + 2.0f;
-          int numCols = (int)rowPal.colors.size();
-          float sW = barW / (float)numCols;
-
-          drawList->AddRectFilled(ImVec2(barX, barY),
-                                  ImVec2(barX + barW, barY + barH),
-                                  IM_COL32(20, 20, 20, 255));
-          for (int c = 0; c < numCols; ++c) {
-            const auto &col = rowPal.colors[c];
-            ImVec2 cp0(barX + c * sW, barY);
-            ImVec2 cp1(barX + (c + 1) * sW, barY + barH);
-            if (col.a == 0 && col.r == 0 && col.g == 0 && col.b == 0) {
-              drawList->AddRectFilled(cp0, cp1, IM_COL32(25, 25, 30, 255));
-              drawList->AddLine(cp0, cp1, IM_COL32(70, 70, 80, 255));
-            } else {
-              drawList->AddRectFilled(cp0, cp1,
-                                      IM_COL32(col.r, col.g, col.b, 255));
-            }
-          }
-          drawList->AddRect(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH),
-                            IM_COL32(60, 60, 60, 255));
-        }
-
-        ImGui::PopID();
-      }
-      ImGui::EndCombo();
-    }
-    if (!canStep) ImGui::EndDisabled();
-
-    ImGui::SameLine();
-
-    if (!canStep) ImGui::BeginDisabled();
-    if (ImGui::ArrowButton("##NextPal", ImGuiDir_Right)) {
-      applyNewPalette(currentPalette + 1);
-    }
-    if (!canStep) ImGui::EndDisabled();
-  }
-
-  if (!activeTexture.GetPalettes().empty()) {
-    int palIdx =
-        std::clamp(currentPalette, 0, (int)activeTexture.GetPalettes().size() - 1);
-    const auto &pal = activeTexture.GetPalettes()[palIdx];
-    if (!pal.colors.empty()) {
-      float availWidth = ImGui::GetContentRegionAvail().x;
-      float barHeight = 16.0f;
-      ImVec2 barPos = ImGui::GetCursorScreenPos();
-      ImDrawList *drawList = ImGui::GetWindowDrawList();
-
-      ImGui::InvisibleButton("##PaletteColorPreview",
-                             ImVec2(availWidth, barHeight));
-      bool isHovered = ImGui::IsItemHovered();
-      ImVec2 mousePos = ImGui::GetMousePos();
-
-      int numColors = (int)pal.colors.size();
-      float swatchW = availWidth / (float)numColors;
-
-      int hoveredColorIdx = -1;
-      if (isHovered && mousePos.x >= barPos.x &&
-          mousePos.x < barPos.x + availWidth) {
-        hoveredColorIdx =
-            std::clamp((int)((mousePos.x - barPos.x) / swatchW), 0,
-                       numColors - 1);
-      }
-
-      drawList->AddRectFilled(barPos,
-                              ImVec2(barPos.x + availWidth, barPos.y + barHeight),
-                              IM_COL32(20, 20, 20, 255));
-
-      for (int i = 0; i < numColors; ++i) {
-        const auto &c = pal.colors[i];
-        ImVec2 p0(barPos.x + i * swatchW, barPos.y);
-        ImVec2 p1(barPos.x + (i + 1) * swatchW, barPos.y + barHeight);
-
-        if (c.a == 0 && c.r == 0 && c.g == 0 && c.b == 0) {
-          drawList->AddRectFilled(p0, p1, IM_COL32(25, 25, 30, 255));
-          drawList->AddLine(p0, p1, IM_COL32(70, 70, 80, 255));
-        } else {
-          drawList->AddRectFilled(p0, p1, IM_COL32(c.r, c.g, c.b, 255));
-        }
-      }
-
-      drawList->AddRect(barPos,
-                        ImVec2(barPos.x + availWidth, barPos.y + barHeight),
-                        IM_COL32(80, 80, 80, 255));
-
-      if (hoveredColorIdx >= 0 && hoveredColorIdx < numColors) {
-        const auto &hc = pal.colors[hoveredColorIdx];
-        ImVec2 hp0(barPos.x + hoveredColorIdx * swatchW, barPos.y);
-        ImVec2 hp1(barPos.x + (hoveredColorIdx + 1) * swatchW,
-                   barPos.y + barHeight);
-        drawList->AddRect(hp0, hp1, IM_COL32(255, 255, 255, 255), 0.0f, 0, 2.0f);
-
-        ImGui::BeginTooltip();
-        ImGui::Text("Color #%d / %d", hoveredColorIdx, numColors);
-        ImGui::Text("RGB: (%d, %d, %d)", hc.r, hc.g, hc.b);
-        ImGui::Text("Hex: #%02X%02X%02X", hc.r, hc.g, hc.b);
-        if (hc.a == 0)
-          ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
-                             "(Transparent STP)");
-        ImGui::EndTooltip();
-      }
-    }
-  }
+  PaletteInspectorWidget::Draw(
+      activeTexture, currentPalette,
+      [&](int newPal) {
+        ApplyFaceMutation(
+            localGeometryOverlay, sceneViewport, fileManager, history,
+            activeFace, activeMesh, activeObjName,
+            [&](RenderFace &face, const ParsedChunk *, RenderObject &) {
+              face.paletteRow = newPal;
+            },
+            "Change palette to row " + std::to_string(newPal));
+      });
 }
 
 void TextureMapPanel::DrawUVCanvas(

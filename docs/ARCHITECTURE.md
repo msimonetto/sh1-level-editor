@@ -263,6 +263,10 @@ Modular ImGui windows providing specialized editing controls and inspectors.
 - **`SelectedTile`**: Bounding box representing active UV tile selection.
 - **`TextureMapPanel`**: Texture and UV mapping panel. Displays loaded TIM textures, CLUT row selector with interactive color bar, 2D UV canvas with real-time LMB box and MMB single-vertex coordinate dragging, active dependency tracking via `DependencyManager`, tile grid picker, and controls for 3D face paint mode.
 
+### `TextureWidgets.h`
+- **`TextureSelectorWidget`**: Reusable texture discovery and selection widget with scope filtering (`Assets`, `Workspace`, `Selected Chunks`, `Current Chunk`, `Current Mesh`), combo dropdown, and "From file" browser.
+- **`PaletteInspectorWidget`**: Reusable CLUT palette widget with row stepper buttons, dropdown combo with 16-color preview strips, and interactive hoverable color swatch palette bar.
+
 ### `ViewportToolsPanel.h`
 - **`ViewportMode`**: Enum defining active editor viewport modes (`Scene`, `LocalGeometry`, `Collision`, `DoorsAndWaypoints`, `Spawns`, `Camera`, `Audio`, `TextureEditor`).
 - **`ViewportToolsPanel`**: Tabbed conduit panel hosting mode selectors and delegating content drawing to active mode inspectors (`LocalGeometryPanel`, `WaypointsPanel`, etc.).
