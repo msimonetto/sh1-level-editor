@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
 
   Textures testTexture;
   Config::Get().LastTexturePath = ""; // User requested empty panel on startup
-  Config::Get().Save(); // Remove from config.ini on startup
+  Config::Get().Save(); // Remove from config.json on startup
 
   int currentPalette = 0;
 

@@ -73,7 +73,7 @@ public:
 
 private:
   Config() = default;
-  const std::string m_configPath = "config.ini";
+  const std::string m_configPath = "config.json";
 
   // Helper functions for parsing
   std::string ColorToString(Color c);

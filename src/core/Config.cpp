@@ -3,6 +3,42 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <nlohmann/json.hpp>
+
+// Serialization helpers for Raylib types
+inline void to_json(nlohmann::json& j, const Color& c) {
+    j = nlohmann::json{{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}};
+}
+
+inline void from_json(const nlohmann::json& j, Color& c) {
+    if (j.is_object()) {
+        c.r = j.value("r", (unsigned char)0);
+        c.g = j.value("g", (unsigned char)0);
+        c.b = j.value("b", (unsigned char)0);
+        c.a = j.value("a", (unsigned char)255);
+    } else if (j.is_array() && j.size() >= 3) {
+        c.r = j[0].get<unsigned char>();
+        c.g = j[1].get<unsigned char>();
+        c.b = j[2].get<unsigned char>();
+        c.a = (j.size() > 3) ? j[3].get<unsigned char>() : (unsigned char)255;
+    }
+}
+
+inline void to_json(nlohmann::json& j, const Vector3& v) {
+    j = nlohmann::json{{"x", v.x}, {"y", v.y}, {"z", v.z}};
+}
+
+inline void from_json(const nlohmann::json& j, Vector3& v) {
+    if (j.is_object()) {
+        v.x = j.value("x", 0.0f);
+        v.y = j.value("y", 0.0f);
+        v.z = j.value("z", 0.0f);
+    } else if (j.is_array() && j.size() >= 3) {
+        v.x = j[0].get<float>();
+        v.y = j[1].get<float>();
+        v.z = j[2].get<float>();
+    }
+}
 
 Config& Config::Get() {
     static Config instance;
@@ -74,107 +110,109 @@ void Config::Load() {
     std::ifstream file(m_configPath);
     if (!file.is_open()) return;
 
-    std::string line;
-    while (std::getline(file, line)) {
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
-            line.pop_back();
-        }
-        size_t delim = line.find('=');
-        if (delim != std::string::npos) {
-            std::string key = line.substr(0, delim);
-            std::string value = line.substr(delim + 1);
+    try {
+        nlohmann::json config;
+        file >> config;
 
-            while (!key.empty() && (key.back() == ' ' || key.back() == '\t')) key.pop_back();
-            size_t vstart = value.find_first_not_of(" \t");
-            if (vstart != std::string::npos) value = value.substr(vstart);
-            while (!value.empty() && (value.back() == ' ' || value.back() == '\t')) value.pop_back();
+        LastTexturePath = config.value("LastTexturePath", LastTexturePath);
+        LastIPDPath = config.value("LastIPDPath", LastIPDPath);
+        IsHiDPI = config.value("IsHiDPI", IsHiDPI);
+        ProjectDirectory = config.value("ProjectDirectory", ProjectDirectory);
+        GameDirectory = config.value("GameDirectory", GameDirectory);
+        SelectedPrefix = config.value("SelectedPrefix", SelectedPrefix);
+        LastMapKey = config.value("LastMapKey", LastMapKey);
 
-            if (key == "LastTexturePath") LastTexturePath = value;
-            else if (key == "LastIPDPath") LastIPDPath = value;
-            else if (key == "IsHiDPI") IsHiDPI = (value == "1" || value == "true");
-            else if (key == "ProjectDirectory") ProjectDirectory = value;
-            else if (key == "GameDirectory") GameDirectory = value;
-            else if (key == "SelectedPrefix") SelectedPrefix = value;
-            else if (key == "LastMapKey") LastMapKey = value;
-            else if (key == "ColorSelected") ColorSelected = StringToColor(value);
-            else if (key == "ColorWorkspace") ColorWorkspace = StringToColor(value);
-            else if (key == "ColorDeployment") ColorDeployment = StringToColor(value);
-            else if (key == "ColorUnloaded") ColorUnloaded = StringToColor(value);
-            else if (key == "UndoDepth") UndoDepth = std::stoi(value);
-            else if (key == "ShowMajorGridlines") ShowMajorGridlines = (value == "1" || value == "true");
-            else if (key == "ShowMinorGridlines") ShowMinorGridlines = (value == "1" || value == "true");
-            else if (key == "GridCellSize") GridCellSize = std::stof(value);
-            else if (key == "EnableDitheringMode") EnableDitheringMode = (value == "1" || value == "true");
-            else if (key == "ShowPersistentWireframe") ShowPersistentWireframe = (value == "1" || value == "true");
-            else if (key == "WireframeColor") WireframeColor = StringToColor(value);
-            else if (key == "WireframeThickness") WireframeThickness = std::stof(value);
-            else if (key == "KeyMoveForward") KeyMoveForward = std::stoi(value);
-            else if (key == "KeyMoveBackward") KeyMoveBackward = std::stoi(value);
-            else if (key == "KeyMoveLeft") KeyMoveLeft = std::stoi(value);
-            else if (key == "KeyMoveRight") KeyMoveRight = std::stoi(value);
-            else if (key == "KeyMoveUp") KeyMoveUp = std::stoi(value);
-            else if (key == "KeyMoveDown") KeyMoveDown = std::stoi(value);
-            else if (key == "KeyMultiselect") KeyMultiselect = std::stoi(value);
-            else if (key == "KeyCamMoveForward") KeyCamMoveForward = std::stoi(value);
-            else if (key == "KeyCamMoveBackward") KeyCamMoveBackward = std::stoi(value);
-            else if (key == "KeyCamMoveLeft") KeyCamMoveLeft = std::stoi(value);
-            else if (key == "KeyCamMoveRight") KeyCamMoveRight = std::stoi(value);
-            else if (key == "KeyCamMoveUp") KeyCamMoveUp = std::stoi(value);
-            else if (key == "KeyCamMoveUp") KeyCamMoveUp = std::stoi(value);
-            else if (key == "KeyCamMoveDown") KeyCamMoveDown = std::stoi(value);
-            else if (key == "PersistedSelection") PersistedSelection = value;
-            else if (key == "PersistedViewportChunks") PersistedViewportChunks = value;
-            else if (key == "PersistedCamAzimuth") PersistedCamAzimuth = std::stof(value);
-            else if (key == "PersistedCamElevation") PersistedCamElevation = std::stof(value);
-            else if (key == "PersistedCamDistance") PersistedCamDistance = std::stof(value);
-            else if (key == "PersistedCamTarget") PersistedCamTarget = StringToVector3(value);
-            else if (key == "PersistedToolsTab") PersistedToolsTab = std::stoi(value);
-        }
+        ColorSelected = config.value("ColorSelected", ColorSelected);
+        ColorWorkspace = config.value("ColorWorkspace", ColorWorkspace);
+        ColorDeployment = config.value("ColorDeployment", ColorDeployment);
+        ColorUnloaded = config.value("ColorUnloaded", ColorUnloaded);
+        UndoDepth = config.value("UndoDepth", UndoDepth);
+
+        ShowMajorGridlines = config.value("ShowMajorGridlines", ShowMajorGridlines);
+        ShowMinorGridlines = config.value("ShowMinorGridlines", ShowMinorGridlines);
+        GridCellSize = config.value("GridCellSize", GridCellSize);
+        EnableDitheringMode = config.value("EnableDitheringMode", EnableDitheringMode);
+        ShowPersistentWireframe = config.value("ShowPersistentWireframe", ShowPersistentWireframe);
+        WireframeColor = config.value("WireframeColor", WireframeColor);
+        WireframeThickness = config.value("WireframeThickness", WireframeThickness);
+
+        KeyMoveForward = config.value("KeyMoveForward", KeyMoveForward);
+        KeyMoveBackward = config.value("KeyMoveBackward", KeyMoveBackward);
+        KeyMoveLeft = config.value("KeyMoveLeft", KeyMoveLeft);
+        KeyMoveRight = config.value("KeyMoveRight", KeyMoveRight);
+        KeyMoveUp = config.value("KeyMoveUp", KeyMoveUp);
+        KeyMoveDown = config.value("KeyMoveDown", KeyMoveDown);
+        KeyMultiselect = config.value("KeyMultiselect", KeyMultiselect);
+
+        KeyCamMoveForward = config.value("KeyCamMoveForward", KeyCamMoveForward);
+        KeyCamMoveBackward = config.value("KeyCamMoveBackward", KeyCamMoveBackward);
+        KeyCamMoveLeft = config.value("KeyCamMoveLeft", KeyCamMoveLeft);
+        KeyCamMoveRight = config.value("KeyCamMoveRight", KeyCamMoveRight);
+        KeyCamMoveUp = config.value("KeyCamMoveUp", KeyCamMoveUp);
+        KeyCamMoveDown = config.value("KeyCamMoveDown", KeyCamMoveDown);
+
+        PersistedSelection = config.value("PersistedSelection", PersistedSelection);
+        PersistedViewportChunks = config.value("PersistedViewportChunks", PersistedViewportChunks);
+        PersistedCamAzimuth = config.value("PersistedCamAzimuth", PersistedCamAzimuth);
+        PersistedCamElevation = config.value("PersistedCamElevation", PersistedCamElevation);
+        PersistedCamDistance = config.value("PersistedCamDistance", PersistedCamDistance);
+        PersistedCamTarget = config.value("PersistedCamTarget", PersistedCamTarget);
+        PersistedToolsTab = config.value("PersistedToolsTab", PersistedToolsTab);
+    } catch (const std::exception& e) {
+        // Fallback gracefully if corrupted
     }
 }
 
 void Config::Save() {
+    nlohmann::json config;
+    config["LastTexturePath"] = LastTexturePath;
+    config["LastIPDPath"] = LastIPDPath;
+    config["IsHiDPI"] = IsHiDPI;
+    config["ProjectDirectory"] = ProjectDirectory;
+    config["GameDirectory"] = GameDirectory;
+    config["SelectedPrefix"] = SelectedPrefix;
+    config["LastMapKey"] = LastMapKey;
+
+    config["ColorSelected"] = ColorSelected;
+    config["ColorWorkspace"] = ColorWorkspace;
+    config["ColorDeployment"] = ColorDeployment;
+    config["ColorUnloaded"] = ColorUnloaded;
+    config["UndoDepth"] = UndoDepth;
+
+    config["ShowMajorGridlines"] = ShowMajorGridlines;
+    config["ShowMinorGridlines"] = ShowMinorGridlines;
+    config["GridCellSize"] = GridCellSize;
+    config["EnableDitheringMode"] = EnableDitheringMode;
+    config["ShowPersistentWireframe"] = ShowPersistentWireframe;
+    config["WireframeColor"] = WireframeColor;
+    config["WireframeThickness"] = WireframeThickness;
+
+    config["KeyMoveForward"] = KeyMoveForward;
+    config["KeyMoveBackward"] = KeyMoveBackward;
+    config["KeyMoveLeft"] = KeyMoveLeft;
+    config["KeyMoveRight"] = KeyMoveRight;
+    config["KeyMoveUp"] = KeyMoveUp;
+    config["KeyMoveDown"] = KeyMoveDown;
+    config["KeyMultiselect"] = KeyMultiselect;
+
+    config["KeyCamMoveForward"] = KeyCamMoveForward;
+    config["KeyCamMoveBackward"] = KeyCamMoveBackward;
+    config["KeyCamMoveLeft"] = KeyCamMoveLeft;
+    config["KeyCamMoveRight"] = KeyCamMoveRight;
+    config["KeyCamMoveUp"] = KeyCamMoveUp;
+    config["KeyCamMoveDown"] = KeyCamMoveDown;
+
+    config["PersistedSelection"] = PersistedSelection;
+    config["PersistedViewportChunks"] = PersistedViewportChunks;
+    config["PersistedCamAzimuth"] = PersistedCamAzimuth;
+    config["PersistedCamElevation"] = PersistedCamElevation;
+    config["PersistedCamDistance"] = PersistedCamDistance;
+    config["PersistedCamTarget"] = PersistedCamTarget;
+    config["PersistedToolsTab"] = PersistedToolsTab;
+
     std::ofstream file(m_configPath);
     if (file.is_open()) {
-        file << "LastTexturePath=" << LastTexturePath << "\n";
-        file << "LastIPDPath=" << LastIPDPath << "\n";
-        file << "IsHiDPI=" << (IsHiDPI ? "1" : "0") << "\n";
-        file << "ProjectDirectory=" << ProjectDirectory << "\n";
-        file << "GameDirectory=" << GameDirectory << "\n";
-        file << "SelectedPrefix=" << SelectedPrefix << "\n";
-        file << "LastMapKey=" << LastMapKey << "\n";
-        file << "ColorSelected=" << ColorToString(ColorSelected) << "\n";
-        file << "ColorWorkspace=" << ColorToString(ColorWorkspace) << "\n";
-        file << "ColorDeployment=" << ColorToString(ColorDeployment) << "\n";
-        file << "ColorUnloaded=" << ColorToString(ColorUnloaded) << "\n";
-        file << "UndoDepth=" << UndoDepth << "\n";
-        file << "ShowMajorGridlines=" << (ShowMajorGridlines ? "1" : "0") << "\n";
-        file << "ShowMinorGridlines=" << (ShowMinorGridlines ? "1" : "0") << "\n";
-        file << "GridCellSize=" << GridCellSize << "\n";
-        file << "EnableDitheringMode=" << (EnableDitheringMode ? "1" : "0") << "\n";
-        file << "ShowPersistentWireframe=" << (ShowPersistentWireframe ? "1" : "0") << "\n";
-        file << "WireframeColor=" << ColorToString(WireframeColor) << "\n";
-        file << "WireframeThickness=" << WireframeThickness << "\n";
-        file << "KeyMoveForward=" << KeyMoveForward << "\n";
-        file << "KeyMoveBackward=" << KeyMoveBackward << "\n";
-        file << "KeyMoveLeft=" << KeyMoveLeft << "\n";
-        file << "KeyMoveRight=" << KeyMoveRight << "\n";
-        file << "KeyMoveUp=" << KeyMoveUp << "\n";
-        file << "KeyMoveDown=" << KeyMoveDown << "\n";
-        file << "KeyMultiselect=" << KeyMultiselect << "\n";
-        file << "KeyCamMoveForward=" << KeyCamMoveForward << "\n";
-        file << "KeyCamMoveBackward=" << KeyCamMoveBackward << "\n";
-        file << "KeyCamMoveLeft=" << KeyCamMoveLeft << "\n";
-        file << "KeyCamMoveRight=" << KeyCamMoveRight << "\n";
-        file << "KeyCamMoveUp=" << KeyCamMoveUp << "\n";
-        file << "KeyCamMoveDown=" << KeyCamMoveDown << "\n";
-        file << "PersistedSelection=" << PersistedSelection << "\n";
-        file << "PersistedViewportChunks=" << PersistedViewportChunks << "\n";
-        file << "PersistedCamAzimuth=" << PersistedCamAzimuth << "\n";
-        file << "PersistedCamElevation=" << PersistedCamElevation << "\n";
-        file << "PersistedCamDistance=" << PersistedCamDistance << "\n";
-        file << "PersistedCamTarget=" << Vector3ToString(PersistedCamTarget) << "\n";
-        file << "PersistedToolsTab=" << PersistedToolsTab << "\n";
+        file << config.dump(4) << "\n";
     }
 }
 
@@ -189,3 +227,4 @@ bool Config::IsMultiselectDown() const {
     }
     return isDown;
 }
+

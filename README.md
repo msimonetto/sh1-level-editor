@@ -79,7 +79,7 @@ To playtest your level edits directly in the [PC Port](https://github.com/SlickA
    `game/PC/pc_port/build/gamedata/SLUS-00707.bin`
 
 6. **Configure editor paths:**
-   In the editor under **Edit $\rightarrow$ Settings** (or via `config.ini`):
+   In the editor under **Edit $\rightarrow$ Settings** (or via `config.json`):
    - **Project Directory:** Set to `data/` (or your preferred workspace path containing `workspace/` and `assets/`).
    - **Game Directory:** Set to `game/` (points to `game/PC` and its override directory for deploying level edits).
 

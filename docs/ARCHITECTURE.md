@@ -69,7 +69,7 @@ Central workspace and asset management engine. Coordinates filesystem operations
   - `Log()`: Dispatches console messages.
 
 ### `Config.h`
-Singleton class managing persistent user preferences via `config.ini`.
+Singleton class managing persistent user preferences via `config.json`.
 - **`Config::Get()`**: Accessor for global configuration instance.
 - **Properties**:
   - Project/Game directory paths, active prefix, last loaded map key.
