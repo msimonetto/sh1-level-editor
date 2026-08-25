@@ -32,6 +32,33 @@ std::string FileDialog::OpenFile(const char *filter) {
   return "";
 }
 
+std::string FileDialog::SaveFile(const char *filter, const char *defaultName) {
+#ifdef _WIN32
+  OPENFILENAMEA ofn;
+  CHAR szFile[260] = {0};
+  if (defaultName && strlen(defaultName) < sizeof(szFile)) {
+    strncpy(szFile, defaultName, sizeof(szFile) - 1);
+  }
+
+  ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
+  ofn.lStructSize = sizeof(OPENFILENAMEA);
+  ofn.hwndOwner = NULL;
+  ofn.lpstrFile = szFile;
+  ofn.nMaxFile = sizeof(szFile);
+  ofn.lpstrFilter = filter;
+  ofn.nFilterIndex = 1;
+  ofn.lpstrFileTitle = NULL;
+  ofn.nMaxFileTitle = 0;
+  ofn.lpstrInitialDir = NULL;
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
+
+  if (GetSaveFileNameA(&ofn) == TRUE) {
+    return std::string(ofn.lpstrFile);
+  }
+#endif
+  return "";
+}
+
 std::string FileDialog::OpenDirectory(const char *title) {
 #ifdef _WIN32
   std::string result = "";

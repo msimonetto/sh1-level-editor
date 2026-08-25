@@ -3,6 +3,7 @@
 #include "formats/Structs.h"
 #include "formats/TIMDecoder.h"
 #include "formats/TIMEncoder.h"
+#include "panels/TextureEditTools.h"
 #include "panels/TextureWidgets.h"
 #include "imgui.h"
 #include <cmath>
@@ -12,15 +13,6 @@
 class FileManager;
 class LocalGeometryOverlay;
 class Viewport;
-
-enum class TextureEditTool {
-  Pencil,       // Pixel Edit
-  RectSelect,   // Rectangular Selection
-  FillBucket,   // Flood Fill Bucket
-  Eyedropper,   // Eyedropper Color Picker
-  Eraser,       // Eraser
-  ImportExport  // Import / Export stub
-};
 
 class TextureEditPanel {
 public:
@@ -63,6 +55,16 @@ private:
   int m_selectedColorIdx = 0;
   TextureEditTool m_activeTool = TextureEditTool::Pencil;
 
+  // Selection marquee state
+  bool m_hasSelection = false;
+  bool m_isSelecting = false;
+  int m_selStartX = 0;
+  int m_selStartY = 0;
+  int m_selMinX = 0;
+  int m_selMinY = 0;
+  int m_selMaxX = 0;
+  int m_selMaxY = 0;
+
   // Canvas navigation state
   float m_zoom = 2.0f; // Continuous exponential zoom scale
   ImVec2 m_panOffset = ImVec2(0.0f, 0.0f);
@@ -95,7 +97,6 @@ private:
                    int currentMapPalette,
                    LocalGeometryOverlay &localGeometryOverlay,
                    Viewport &sceneViewport);
-  void DrawSidePanel(float canvasH);
   void DrawCanvas(float canvasW, float canvasH);
   void DrawClutEditor();
   void DrawColorPickerPopup();
