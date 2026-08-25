@@ -2,18 +2,23 @@
 #include <cstdio>
 
 uint16_t TIMEncoder::ColorToWord(const TIMColor& c) {
-    if (c.a == 0) return 0x0000;
+    if (c.a == 0 && c.r == 0 && c.g == 0 && c.b == 0) return 0x0000;
     
-    // Scale 0-255 back to 0-31
-    uint16_t r = c.r * 31 / 255;
-    uint16_t g = c.g * 31 / 255;
-    uint16_t b = c.b * 31 / 255;
+    // Scale 0-255 back to 0-31 with rounding
+    uint16_t r = (c.r * 31 + 127) / 255;
+    uint16_t g = (c.g * 31 + 127) / 255;
+    uint16_t b = (c.b * 31 + 127) / 255;
     
-    // Simplistic STP logic: if fully opaque, bit 15 is 0 in standard PS1 draw modes, but could be 1 for solid depending on the engine. 
-    // We assume 0 for standard opaque.
-    uint16_t stp = 0; // TODO: properly reconstruct STP if we want to save transparency modes
+    // STP bit: solid black (0,0,0) uses STP=1 (0x8000) so it is not 0x0000 (transparent).
+    // Semi-transparent colors (a > 0 && a < 255) set STP=1.
+    uint16_t stp = 0;
+    if (r == 0 && g == 0 && b == 0 && c.a > 0) {
+        stp = 1;
+    } else if (c.a > 0 && c.a < 255) {
+        stp = 1;
+    }
 
-    return r | (g << 5) | (b << 10) | (stp << 15);
+    return (r & 0x1F) | ((g & 0x1F) << 5) | ((b & 0x1F) << 10) | ((stp & 1) << 15);
 }
 
 bool TIMEncoder::Encode(const DecodedTIM& tim, const std::string& outPath) {

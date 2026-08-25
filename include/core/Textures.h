@@ -24,7 +24,13 @@ public:
     int GetBpp() const { return m_decoded.bpp; }
     
     const std::vector<uint8_t>& GetRawIndices() const { return m_decoded.rawIndices; }
+    std::vector<uint8_t>& GetRawIndices() { return m_decoded.rawIndices; }
+
     const std::vector<TIMPalette>& GetPalettes() const { return m_decoded.palettes; }
+    std::vector<TIMPalette>& GetPalettes() { return m_decoded.palettes; }
+
+    const DecodedTIM& GetDecoded() const { return m_decoded; }
+    DecodedTIM& GetDecoded() { return m_decoded; }
 
     // Apply a different CLUT to the texture and upload to GPU
     void ApplyPalette(int paletteIndex);

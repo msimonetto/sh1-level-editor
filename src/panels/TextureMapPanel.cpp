@@ -1,4 +1,5 @@
 #include "panels/TextureMapPanel.h"
+#include "panels/TextureEditPanel.h"
 #include "viewport/Viewport.h"
 #include "core/Config.h"
 #include "core/FileDialog.h"
@@ -388,6 +389,12 @@ void TextureMapPanel::DrawUVCanvas(
 
   ImGui::Separator();
   ImGui::Checkbox("Snap UVs to 32x32 Grid", &snapToGrid);
+  ImGui::SameLine();
+  if (ImGui::Button(ICON_FA_UP_RIGHT_FROM_SQUARE " Open in Texture Edit")) {
+    if (m_textureEditPanel && !Config::Get().LastTexturePath.empty()) {
+      m_textureEditPanel->Open(Config::Get().LastTexturePath, currentPalette);
+    }
+  }
 
   float availWidth = ImGui::GetContentRegionAvail().x;
   float textureScale = (availWidth > 0.0f) ? (availWidth / 256.0f) : 1.0f;
@@ -403,7 +410,11 @@ void TextureMapPanel::DrawUVCanvas(
   if (ImGui::BeginPopupContextItem("TextureEditContextMenu")) {
     if (ImGui::MenuItem("Reset UV to Original")) {}
     if (ImGui::MenuItem("Save to Recent Tiles")) {}
-    if (ImGui::MenuItem("Open in Texture Edit")) {}
+    if (ImGui::MenuItem("Open in Texture Edit")) {
+      if (m_textureEditPanel && !Config::Get().LastTexturePath.empty()) {
+        m_textureEditPanel->Open(Config::Get().LastTexturePath, currentPalette);
+      }
+    }
     ImGui::EndPopup();
   }
 

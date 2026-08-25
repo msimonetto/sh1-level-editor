@@ -257,7 +257,7 @@ Modular ImGui windows providing specialized editing controls and inspectors.
 - **`SettingsPanel`**: Editor preferences panel for editing paths, interface theme colors, grid dimensions, wireframe settings, keybindings, and undo buffer depth.
 
 ### `TextureEditPanel.h`
-- **`TextureEditPanel`**: Dedicated texture inspector / utility canvas and arbitrary TIM file path loading/browsing (`DrawFromFileControls`).
+- **`TextureEditPanel`**: Standalone pop-out texture editor window for TIM texture inspection and modification. Operates on an isolated in-memory working copy of `DecodedTIM`, provides zoomable pixel canvas navigation with pixel grid and hover inspection, CLUT palette table editing with 15-bit BGR555 quantization and STP flag toggling, and atomic Save/Revert synchronization with `TextureCache`, `TextureMapPanel`, and 3D viewport batch rebuilds.
 
 ### `TextureMapPanel.h`
 - **`SelectedTile`**: Bounding box representing active UV tile selection.

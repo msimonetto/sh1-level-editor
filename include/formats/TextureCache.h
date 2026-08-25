@@ -46,6 +46,9 @@ public:
     Material CreateMeshMaterial(const std::string& texName, int paletteRow,
                                 const std::string& workspaceDir);
 
+    // Invalidate and release cached GPU textures for a specific texture name so subsequent Fetch calls reload from disk
+    void Invalidate(const std::string& texName);
+
     // Release all cached GPU textures and shader. Call before CloseWindow().
     void UnloadAll();
 

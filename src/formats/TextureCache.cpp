@@ -172,6 +172,21 @@ Material TextureCache::CreateMeshMaterial(const std::string& texName, int palett
     return mat;
 }
 
+void TextureCache::Invalidate(const std::string& texName) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    auto it = m_entries.find(texName);
+    if (it != m_entries.end()) {
+        for (auto& [row, tex] : it->second.paletteTextures) {
+            if (tex.id != 0) {
+                UnloadTexture(tex);
+            }
+        }
+        it->second.paletteTextures.clear();
+        it->second.image = nullptr;
+        m_entries.erase(it);
+    }
+}
+
 void TextureCache::UnloadAll() {
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& [name, entry] : m_entries) {
