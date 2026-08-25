@@ -2,6 +2,7 @@
 #include "core/Textures.h"
 #include "formats/Structs.h"
 #include "imgui.h"
+#include <functional>
 #include <string>
 
 enum class TextureEditTool {
@@ -46,7 +47,8 @@ public:
                             int &editingR5, int &editingG5, int &editingB5,
                             bool &editingStp, Textures &workingTexture,
                             int currentPalette, const std::string &texName,
-                            float canvasH, bool isReadOnly);
+                            float canvasH, bool isReadOnly,
+                            std::function<void()> onBeforeImport = nullptr);
 
   // Renders marquee selection overlay on canvas
   static void DrawSelectionMarquee(ImDrawList *drawList, ImVec2 p0, float zoom,

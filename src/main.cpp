@@ -293,7 +293,8 @@ int main(int argc, char **argv) {
     viewportSync.Update(fileManager, viewport,
                         localGeometryOverlay);
     shortcuts.Handle(history, fileManager, viewport,
-                     localGeometryOverlay, &eventOverlay);
+                     localGeometryOverlay, &eventOverlay,
+                     &textureEditManager);
 
     // Show Viewports
     viewport.Draw();

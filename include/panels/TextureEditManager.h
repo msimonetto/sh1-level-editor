@@ -31,6 +31,9 @@ public:
   // Checks if a window is currently open for the given path
   bool IsOpen(const std::string &timPath) const;
 
+  // Checks if any texture editor window is currently focused
+  bool HasFocusedPanel() const;
+
 private:
   std::vector<std::unique_ptr<TextureEditPanel>> m_panels;
 };

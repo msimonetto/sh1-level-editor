@@ -101,3 +101,12 @@ bool TextureEditManager::IsOpen(const std::string &timPath) const {
   }
   return false;
 }
+
+bool TextureEditManager::HasFocusedPanel() const {
+  for (const auto &panel : m_panels) {
+    if (panel && panel->IsOpen() && panel->IsFocused()) {
+      return true;
+    }
+  }
+  return false;
+}

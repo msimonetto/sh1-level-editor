@@ -249,7 +249,8 @@ void TextureEditTools::DrawSidePanel(
     TextureEditTool &activeTool, int &selectedColorIdx, int &editingColorIdx,
     TIMColor &editingColor, int &editingR5, int &editingG5, int &editingB5,
     bool &editingStp, Textures &workingTexture, int currentPalette,
-    const std::string &texName, float canvasH, bool isReadOnly) {
+    const std::string &texName, float canvasH, bool isReadOnly,
+    std::function<void()> onBeforeImport) {
   float sidePanelW = 46.0f;
   ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 28, 255));
   ImGui::BeginChild("TextureEditToolsSidePanel", ImVec2(sidePanelW, canvasH),
@@ -303,6 +304,9 @@ void TextureEditTools::DrawSidePanel(
     std::string path =
         FileDialog::OpenFile("PNG Files\0*.png;*.PNG\0All Files\0*.*\0");
     if (!path.empty()) {
+      if (onBeforeImport) {
+        onBeforeImport();
+      }
       ImportImageFile(workingTexture, currentPalette, path, isReadOnly);
     }
   }

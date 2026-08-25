@@ -5,14 +5,20 @@
 #include "formats/IPDWrite.h"
 #include "geometry/FaceOperations.h"
 #include "imgui.h"
+#include "panels/TextureEditManager.h"
 #include "raylib.h"
 #include "viewport/Viewport.h"
 
 void Shortcuts::Handle(History &history,
-                             FileManager &fileManager,
-                             Viewport &sceneViewport,
-                             LocalGeometryOverlay &localGeometryOverlay,
-                             WaypointsOverlay *eventViewport) {
+                       FileManager &fileManager,
+                       Viewport &sceneViewport,
+                       LocalGeometryOverlay &localGeometryOverlay,
+                       WaypointsOverlay *eventViewport,
+                       TextureEditManager *textureEditManager) {
+  // If a texture editor window is focused, skip global scene shortcuts so the popout handles them
+  if (textureEditManager && textureEditManager->HasFocusedPanel())
+    return;
+
   if (IsKeyDown(KEY_LEFT_CONTROL)) {
     if (IsKeyPressed(KEY_Z))
       history.Undo(sceneViewport, localGeometryOverlay, eventViewport,

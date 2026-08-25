@@ -32,6 +32,29 @@ static bool IsWorkspacePath(const std::string &filePath,
   }
 }
 
+static std::string FindAssetTimPath(const std::string &texName,
+                                    const std::string &assetsDir) {
+  if (texName.empty() || assetsDir.empty())
+    return "";
+
+  namespace fs = std::filesystem;
+  std::vector<fs::path> candidates = {
+      fs::path(assetsDir) / "BG" / (texName + ".TIM"),
+      fs::path(assetsDir) / "BG" / (texName + ".tim"),
+      fs::path(assetsDir) / "TIM" / (texName + ".TIM"),
+      fs::path(assetsDir) / "TIM" / (texName + ".tim"),
+      fs::path(assetsDir) / (texName + ".TIM"),
+      fs::path(assetsDir) / (texName + ".tim"),
+  };
+
+  for (const auto &p : candidates) {
+    if (fs::exists(p) && fs::is_regular_file(p)) {
+      return p.string();
+    }
+  }
+  return "";
+}
+
 TextureEditPanel::TextureEditPanel() = default;
 
 TextureEditPanel::~TextureEditPanel() {
@@ -41,11 +64,14 @@ TextureEditPanel::~TextureEditPanel() {
 void TextureEditPanel::Open(const std::string &timPath, FileManager &fileManager,
                             int initialPaletteRow) {
   bool isReadOnly = !IsWorkspacePath(timPath, fileManager.GetWorkspaceDir());
-  Open(timPath, isReadOnly, initialPaletteRow);
+  std::string texName = std::filesystem::path(timPath).stem().string();
+  std::string assetTimPath = FindAssetTimPath(texName, fileManager.GetAssetsDir());
+  Open(timPath, isReadOnly, initialPaletteRow, assetTimPath);
 }
 
 void TextureEditPanel::Open(const std::string &timPath, bool isReadOnly,
-                            int initialPaletteRow) {
+                            int initialPaletteRow,
+                            const std::string &assetTimPath) {
   if (timPath.empty())
     return;
 
@@ -58,7 +84,24 @@ void TextureEditPanel::Open(const std::string &timPath, bool isReadOnly,
     return;
   }
 
-  m_originalTim = m_workingTexture.GetDecoded();
+  // Look up pristine original asset from disk
+  std::string resolvedAssetPath = assetTimPath;
+  if (resolvedAssetPath.empty()) {
+    std::string defaultAssetsDir =
+        (std::filesystem::path(Config::Get().ProjectDirectory) / "assets").string();
+    resolvedAssetPath = FindAssetTimPath(m_texName, defaultAssetsDir);
+  }
+
+  m_hasOriginalAsset = false;
+  if (!resolvedAssetPath.empty() && std::filesystem::exists(resolvedAssetPath)) {
+    if (TIMDecoder::Decode(resolvedAssetPath, m_originalTim)) {
+      m_hasOriginalAsset = true;
+    }
+  }
+  if (!m_hasOriginalAsset) {
+    m_originalTim = m_workingTexture.GetDecoded();
+  }
+
   int numPalettes = (int)m_workingTexture.GetPalettes().size();
   m_currentPalette = (numPalettes > 0)
                          ? std::clamp(initialPaletteRow, 0, numPalettes - 1)
@@ -76,6 +119,36 @@ void TextureEditPanel::Open(const std::string &timPath, bool isReadOnly,
   m_isSelecting = false;
   m_shouldAutoFit = true;
   m_focusRequested = true;
+}
+
+bool TextureEditPanel::IsDifferentFromOriginal() const {
+  const auto &cur = m_workingTexture.GetDecoded();
+  if (cur.width != m_originalTim.width || cur.height != m_originalTim.height ||
+      cur.bpp != m_originalTim.bpp)
+    return true;
+  if (cur.rawIndices != m_originalTim.rawIndices)
+    return true;
+  if (cur.directPixels.size() != m_originalTim.directPixels.size())
+    return true;
+  for (size_t i = 0; i < cur.directPixels.size(); ++i) {
+    const auto &c1 = cur.directPixels[i];
+    const auto &c2 = m_originalTim.directPixels[i];
+    if (c1.r != c2.r || c1.g != c2.g || c1.b != c2.b || c1.a != c2.a)
+      return true;
+  }
+  if (cur.palettes.size() != m_originalTim.palettes.size())
+    return true;
+  for (size_t p = 0; p < cur.palettes.size(); ++p) {
+    if (cur.palettes[p].colors.size() != m_originalTim.palettes[p].colors.size())
+      return true;
+    for (size_t c = 0; c < cur.palettes[p].colors.size(); ++c) {
+      const auto &c1 = cur.palettes[p].colors[c];
+      const auto &c2 = m_originalTim.palettes[p].colors[c];
+      if (c1.r != c2.r || c1.g != c2.g || c1.b != c2.b || c1.a != c2.a)
+        return true;
+    }
+  }
+  return false;
 }
 
 void TextureEditPanel::SetPalette(int paletteRow) {
@@ -108,7 +181,8 @@ void TextureEditPanel::Save(FileManager &fileManager,
     return;
 
   if (TIMEncoder::Encode(m_workingTexture.GetDecoded(), m_timPath)) {
-    m_originalTim = m_workingTexture.GetDecoded();
+    // Note: m_originalTim is deliberately NOT overwritten here,
+    // so Revert can always restore back to the original game asset file!
     m_isDirty = false;
 
     // Invalidate global texture cache
@@ -132,7 +206,7 @@ void TextureEditPanel::Revert() {
   m_workingTexture.GetDecoded() = m_originalTim;
   m_workingTexture.ApplyPalette(m_currentPalette);
   m_hasSelection = false;
-  m_isDirty = false;
+  m_isDirty = true;
 }
 
 void TextureEditPanel::DrawHeader() {
@@ -182,15 +256,21 @@ void TextureEditPanel::DrawToolbar(FileManager &fileManager,
            localGeometryOverlay, sceneViewport);
     }
     ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("Save modified texture to workspace and update 3D viewport (Ctrl+S).");
+    }
   }
 
   ImGui::SameLine();
-  bool canRevert = !m_isReadOnly && m_isDirty;
+  bool canRevert = !m_isReadOnly && (m_isDirty || IsDifferentFromOriginal());
   ImGui::BeginDisabled(!canRevert);
   if (ImGui::Button(ICON_FA_ROTATE_LEFT " Revert")) {
     Revert();
   }
   ImGui::EndDisabled();
+  if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+    ImGui::SetTooltip("Revert all pixel data and color palettes back to the original game asset file.");
+  }
 
   ImGui::SameLine();
   ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);

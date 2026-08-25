@@ -1,4 +1,5 @@
 #pragma once
+#include "core/TextureUndoBuffer.h"
 #include "core/Textures.h"
 #include "formats/Structs.h"
 #include "formats/TIMDecoder.h"
@@ -21,12 +22,24 @@ public:
 
   // Summons the pop-out window for a specific TIM texture path and palette row
   void Open(const std::string &timPath, FileManager &fileManager, int initialPaletteRow = 0);
-  void Open(const std::string &timPath, bool isReadOnly = false, int initialPaletteRow = 0);
+  void Open(const std::string &timPath, bool isReadOnly = false, int initialPaletteRow = 0,
+            const std::string &assetTimPath = "");
   void Close();
   bool IsOpen() const { return m_isOpen; }
   const std::string &GetTimPath() const { return m_timPath; }
   const std::string &GetTexName() const { return m_texName; }
   bool IsReadOnly() const { return m_isReadOnly; }
+  bool HasOriginalAsset() const { return m_hasOriginalAsset; }
+  bool IsDifferentFromOriginal() const;
+  bool IsFocused() const { return m_isFocused; }
+
+  // Undo / Redo
+  bool Undo();
+  bool Redo();
+  bool CanUndo() const { return m_undoBuffer.CanUndo(); }
+  bool CanRedo() const { return m_undoBuffer.CanRedo(); }
+  const std::string &PeekUndoDesc() const { return m_undoBuffer.PeekUndoDesc(); }
+  const std::string &PeekRedoDesc() const { return m_undoBuffer.PeekRedoDesc(); }
 
   void Focus() { m_focusRequested = true; }
   void SetPalette(int paletteRow);
@@ -48,12 +61,23 @@ private:
   bool m_isOpen = false;
   bool m_isDirty = false;
   bool m_isReadOnly = false;
+  bool m_hasOriginalAsset = false;
   bool m_focusRequested = false;
+  bool m_isFocused = false;
   std::string m_timPath;
   std::string m_texName;
   int m_currentPalette = 0;
   int m_selectedColorIdx = 0;
   TextureEditTool m_activeTool = TextureEditTool::Pencil;
+
+  // Undo buffer
+  TextureUndoBuffer m_undoBuffer;
+
+  // Continuous stroke state (Pencil / Eraser)
+  bool m_isPaintingStroke = false;
+  DecodedTIM m_strokeStartSnapshot;
+  bool m_strokeModified = false;
+  std::string m_strokeDesc;
 
   // Selection marquee state
   bool m_hasSelection = false;
