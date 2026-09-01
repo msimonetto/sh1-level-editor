@@ -55,7 +55,4 @@ namespace Geometry {
     // Adds a low-poly PS1 primitive mesh (0=Floor Plane, 1=Wall Plane, 2=Cube Block, 3=Ramp/Slope).
     bool AddPrimitive(LocalGeometryOverlay& overlay, int primType, float width, float height, float length, History* history);
 
-    // Moves the active local mesh to another chunk in the workspace.
-    bool MoveMeshToChunk(LocalGeometryOverlay& overlay, const std::string& targetChunkName, History* history);
-
-}
+} // namespace Geometry

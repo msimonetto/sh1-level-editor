@@ -12,25 +12,14 @@
 static constexpr float IPD_SCALE   = 1.0f / 256.0f;  // SCALE = 1/256
 static constexpr float IPD_MAP_MAX = 10240.0f;         // MAP_MAX
 
+#include "core/ChunkUtils.h"
+
 // ---------------------------------------------------------------------------
 // Helper for chunk prefix extraction from chunk name / filename.
 // Standard IPD naming convention: <PREFIX><X_HEX><Z_HEX> (e.g. THR0000 -> THR, THRFBFE -> THR, SC0102 -> SC)
 // ---------------------------------------------------------------------------
 inline std::string DeriveChunkPrefix(const std::string& name) {
-    if (name.length() > 4) {
-        std::string tail = name.substr(name.length() - 4);
-        bool isHex4 = true;
-        for (char c : tail) {
-            if (!isxdigit((unsigned char)c)) {
-                isHex4 = false;
-                break;
-            }
-        }
-        if (isHex4) {
-            return name.substr(0, name.length() - 4);
-        }
-    }
-    return name;
+    return Core::ExtractChunkPrefix(name);
 }
 
 // ---------------------------------------------------------------------------

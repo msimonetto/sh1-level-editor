@@ -48,5 +48,5 @@ private:
   void DrawMeshesSection(LocalGeometryOverlay &overlay, History *history);
   void DrawFacesSection(LocalGeometryOverlay &overlay, History *history);
   void DrawVerticesSection(LocalGeometryOverlay &overlay, History *history);
-  void DrawValidationSection(LocalGeometryOverlay &overlay);
+  void DrawValidationSection(LocalGeometryOverlay &overlay, History *history = nullptr);
 };

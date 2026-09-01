@@ -2,6 +2,7 @@
 #include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "geometry/ChunkValidator.h"
+#include "geometry/ChunkOwnership.h"
 #include "geometry/SubdivideFace.h"
 #include "geometry/MeshOperations.h"
 #include "geometry/GlobalObjectOperations.h"
@@ -16,6 +17,8 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+
+using namespace Geometry;
 
 void LocalGeometryPanel::DrawContent(LocalGeometryOverlay &overlay, History *history) {
   DrawSelectionHeader(overlay);
@@ -37,7 +40,7 @@ void LocalGeometryPanel::DrawContent(LocalGeometryOverlay &overlay, History *his
       break;
   }
 
-  DrawValidationSection(overlay);
+  DrawValidationSection(overlay, history);
 }
 
 void LocalGeometryPanel::DrawSelectionHeader(LocalGeometryOverlay &overlay) {
@@ -577,13 +580,15 @@ void LocalGeometryPanel::DrawVerticesSection(LocalGeometryOverlay &overlay, Hist
   }
 }
 
-void LocalGeometryPanel::DrawValidationSection(LocalGeometryOverlay &overlay) {
+void LocalGeometryPanel::DrawValidationSection(LocalGeometryOverlay &overlay, History *history) {
   if (ImGui::CollapsingHeader(ICON_FA_SHIELD_HALVED " PS1 Limits & Validation", ImGuiTreeNodeFlags_DefaultOpen)) {
     float availW = ImGui::GetContentRegionAvail().x;
+    float thirdW = (availW - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
     float halfW = (availW - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
 
     ImGui::Checkbox("Auto-Validate Edits", &overlay.m_autoValidate);
-    ImGui::SameLine();
+    ImGui::Spacing();
+
     if (ImGui::Button("Validate Chunk", ImVec2(halfW, 0))) {
       if (!overlay.GetChunks().empty()) {
         m_hasRunValidation = false;
@@ -601,11 +606,29 @@ void LocalGeometryPanel::DrawValidationSection(LocalGeometryOverlay &overlay) {
         }
       }
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Validate All", ImVec2(halfW, 0))) {
+      if (!overlay.GetChunks().empty()) {
+        m_lastValidationResult = ChunkValidator::ValidateLoadedChunks(overlay.GetChunks());
+        m_hasRunValidation = true;
+      }
+    }
+
+    if (ImGui::Button(ICON_FA_RIGHT_LEFT " Auto-Migrate Misplaced Meshes", ImVec2(availW, 0))) {
+      int migrated = ChunkOwnership::AutoMigrateMisplacedGeometry(overlay, history);
+      if (migrated > 0) {
+        m_lastValidationResult = ChunkValidator::ValidateLoadedChunks(overlay.GetChunks());
+        m_hasRunValidation = true;
+      }
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Scans loaded chunks and moves any meshes or props located in adjacent cells into their proper loaded chunks.");
+    }
 
     if (m_hasRunValidation) {
       if (m_lastValidationResult.IsClean()) {
         ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f),
-                           "[OK] No height, overhang, or vertex capacity issues.");
+                           "[OK] No height, overhang, cross-chunk, or vertex capacity issues.");
       } else {
         ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Errors: %d",
                            m_lastValidationResult.errorCount);

@@ -2,6 +2,7 @@
 #include "formats/Structs.h"
 #include "formats/PLMWrite.h"
 #include "formats/PLMParse.h"
+#include "geometry/ChunkValidator.h"
 #include "raylib.h"
 #include <cstdio>
 #include <cstring>
@@ -10,6 +11,7 @@
 #include <filesystem>
 
 namespace fs = std::filesystem;
+
 
 // ---------------------------------------------------------------------------
 // Utility: Read file
@@ -85,6 +87,16 @@ bool IPDWrite::WriteChunk(const std::string& ipdPath,
                            bool* outFilesWritten) {
     int totalPatched = 0;
     bool anyWritten = false;
+
+    // Run structural & PS1 limits pre-save validation
+    std::vector<std::string> validationWarnings = Validate(chunk);
+    if (!validationWarnings.empty()) {
+        printf("[IPDWrite] Validation check on '%s' found %zu issues:\n", 
+               chunk.chunkName.c_str(), validationWarnings.size());
+        for (const auto& w : validationWarnings) {
+            printf("  %s\n", w.c_str());
+        }
+    }
 
     // --- Patch local (IPD-embedded PLM) ---
     {
@@ -233,9 +245,12 @@ bool IPDWrite::WriteChunk(const std::string& ipdPath,
 // ---------------------------------------------------------------------------
 std::vector<std::string> IPDWrite::Validate(const ParsedChunk& chunk) {
     std::vector<std::string> warnings;
-    
-    // Future checks (once we have buffer size):
-    // - File size > 256 KB (patched engine limit)
+
+    // Run ChunkValidator validation pass
+    ValidationResult valRes = ChunkValidator::ValidateChunk(chunk);
+    for (const auto& issue : valRes.issues) {
+        warnings.push_back(issue.message);
+    }
     
     for (size_t oIdx = 0; oIdx < chunk.objects.size(); ++oIdx) {
         const auto& obj = chunk.objects[oIdx];

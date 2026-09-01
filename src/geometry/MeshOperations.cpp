@@ -468,7 +468,11 @@ bool MergeMeshes(LocalGeometryOverlay& overlay, History* history) {
 
     size_t totalVerts = 0;
     for (const auto& m : obj->meshes) totalVerts += m.vx.size();
-    if (totalVerts > 255) return false;
+    if (totalVerts > VALIDATOR_MAX_VERTS) {
+        printf("[MergeMeshes] Cannot merge: combined vertex count (%zu) exceeds PS1 limit of %d\n",
+               totalVerts, VALIDATOR_MAX_VERTS);
+        return false;
+    }
 
     RenderMesh combined = obj->meshes[0];
     for (size_t mi = 1; mi < obj->meshes.size(); ++mi) {
@@ -583,9 +587,10 @@ bool AddPrimitive(LocalGeometryOverlay& overlay, int primType, float width, floa
     }
     if (!targetLc) return false;
 
-    float baseX = (float)targetLc->data->xPos * 40.0f + 20.0f;
+    Vector3 center = ChunkOwnership::GridToWorldCenter(targetLc->data->xPos, targetLc->data->yPos);
+    float baseX = center.x;
     float baseY = 0.0f;
-    float baseZ = -(float)targetLc->data->yPos * 40.0f - 20.0f;
+    float baseZ = center.z;
 
     float hw = width * 0.5f;
     float hh = height;
@@ -651,34 +656,6 @@ bool AddPrimitive(LocalGeometryOverlay& overlay, int primType, float width, floa
     RecalculateBounds(overlay);
     std::string ws = GetWorkspaceDir(overlay);
     overlay.RebuildChunkBatches(targetLc->data->chunkName, ws);
-    return true;
-}
-
-bool MoveMeshToChunk(LocalGeometryOverlay& overlay, const std::string& targetChunkName, History* history) {
-    if (targetChunkName == overlay.m_selectedChunk || targetChunkName.empty()) return false;
-
-    LoadedChunk* srcLc = nullptr;
-    LoadedChunk* dstLc = nullptr;
-    for (auto& lcConst : overlay.GetChunks()) {
-        auto& lc = const_cast<LoadedChunk&>(lcConst);
-        if (lc.data->chunkName == overlay.m_selectedChunk) srcLc = &lc;
-        if (lc.data->chunkName == targetChunkName) dstLc = &lc;
-    }
-    if (!srcLc || !dstLc || overlay.m_selectedObjectIdx < 0 || overlay.m_selectedObjectIdx >= (int)srcLc->data->objects.size())
-        return false;
-
-    RenderObject movedObj = std::move(srcLc->data->objects[overlay.m_selectedObjectIdx]);
-    srcLc->data->objects.erase(srcLc->data->objects.begin() + overlay.m_selectedObjectIdx);
-
-    dstLc->data->objects.push_back(std::move(movedObj));
-    overlay.m_selectedChunk = targetChunkName;
-    overlay.m_selectedObjectIdx = (int)dstLc->data->objects.size() - 1;
-    overlay.m_selectedMeshIdx = 0;
-
-    RecalculateBounds(overlay);
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(srcLc->data->chunkName, ws);
-    overlay.RebuildChunkBatches(dstLc->data->chunkName, ws);
     return true;
 }
 

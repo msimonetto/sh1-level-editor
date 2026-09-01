@@ -1,5 +1,4 @@
 #include "viewport/LocalGeometryOverlay.h"
-#include "geometry/ChunkValidator.h"
 #include "core/Config.h"
 #include "core/History.h"
 #include "formats/IPDParse.h"

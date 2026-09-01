@@ -1,6 +1,7 @@
 #include "geometry/GlobalObjectOperations.h"
 #include "geometry/TransformOperations.h"
 #include "geometry/GeometryCommon.h"
+#include "geometry/ChunkOwnership.h"
 #include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "formats/IPDParse.h"
@@ -349,46 +350,6 @@ bool MirrorGlobalObject(LocalGeometryOverlay& overlay, int axis, History* histor
         }
         return true;
     });
-}
-
-bool MoveGlobalObjectToChunk(LocalGeometryOverlay& overlay, const std::string& targetChunkName, History* history) {
-    if (targetChunkName == overlay.m_selectedChunk || targetChunkName.empty())
-        return false;
-
-    LoadedChunk* srcLc = nullptr;
-    RenderObject* srcObj = nullptr;
-    if (!GetActiveGlobalObject(overlay, srcLc, srcObj))
-        return false;
-
-    LoadedChunk* dstLc = nullptr;
-    for (auto& lcConst : overlay.GetChunks()) {
-        auto& lc = const_cast<LoadedChunk&>(lcConst);
-        if (lc.data->chunkName == targetChunkName) {
-            dstLc = &lc;
-            break;
-        }
-    }
-    if (!dstLc) return false;
-
-    // Shift rawTx/rawTz relative to destination chunk cell offset
-    int dxCell = srcLc->data->xPos - dstLc->data->xPos;
-    int dyCell = srcLc->data->yPos - dstLc->data->yPos;
-
-    RenderObject movedObj = *srcObj;
-    movedObj.rawTx += dxCell * 10240;
-    movedObj.rawTz += dyCell * 10240;
-
-    // Remove from source and add to dest
-    srcLc->data->objects.erase(srcLc->data->objects.begin() + overlay.m_selectedObjectIdx);
-    dstLc->data->objects.push_back(std::move(movedObj));
-
-    overlay.m_selectedChunk = targetChunkName;
-    overlay.m_selectedObjectIdx = (int)dstLc->data->objects.size() - 1;
-
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(srcLc->data->chunkName, ws);
-    overlay.RebuildChunkBatches(dstLc->data->chunkName, ws);
-    return true;
 }
 
 } // namespace Geometry

@@ -48,6 +48,14 @@ sh1-level-editor/
 
 Responsible for binary format parsing, patch serialization, undo/redo history, asset management, and configuration.
 
+### `ChunkUtils.h`
+Standardized chunk name regex validation, prefix extraction, and coordinate encoding/decoding:
+- `CHUNK_NAME_REGEX`: Standard regex `^([A-Za-z0-9_]+?)([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})$` matching Silent Hill 1 naming convention.
+- `IsValidChunkName(name)`: Validates conforming chunk name.
+- `ParseChunkName(name, outPrefix, outX, outY)`: Extracts prefix and signed 8-bit grid coordinates.
+- `ExtractChunkPrefix(name)`: Strips coordinates to extract asset prefix.
+- `FormatChunkName(prefix, x, y)`: Formats standard 8-character chunk name (`THR0102`, `THRFBFE`).
+
 ### `FileManager.h`
 Central workspace and asset management engine. Coordinates filesystem operations, chunk discovery, multi-selection, viewport reload queues, native asset deployment/extraction pipelines, and OBJ exporting.
 - **`ChunkInfo`**: Metadata struct containing `name`, `prefix`, grid coordinates `(x, z)`, and `hasCoords`.
@@ -339,27 +347,43 @@ The unified visual geometry renderer and host for viewport overlays.
 
 Low-level polygonal math, structural operations, and PlayStation hardware constraints enforcement.
 
+### `ChunkOwnership.h`
+Spatial mapping, grid cell math, chunk ownership resolution, occupancy analysis, and mesh/prop migration in the `Geometry` namespace:
+- **`ChunkGridCell`**: 2D signed grid cell coordinates `(x, y)`.
+- **`ChunkOccupancy`**: Coverage analysis tracking occupied grid cells, dominant cell, multi-chunk spanning status, and suggested chunk names.
+- **`ChunkOwnership`**:
+  - `WorldToGridPos(worldPos)`: Converts 3D world coordinates to 2D chunk grid cell `(gx, gy)`.
+  - `GridToWorldBounds(xPos, yPos, includeOverhang)`: Computes 3D AABB bounding box for a chunk cell.
+  - `GridToWorldCenter(xPos, yPos)`: Computes 3D world center point for a chunk.
+  - `FormatChunkName()`, `ParseChunkName()`, `ExtractChunkPrefix()`: Standardized chunk naming helpers.
+  - `AnalyzeMeshOccupancy(mesh, currentChunkX, currentChunkY, prefix)`: Determines all grid cells covered by a mesh.
+  - `DetermineMeshOwner()`, `DetermineObjectOwner()`, `DeterminePositionOwner()`: Identifies target owner chunk from spatial location.
+  - `MigrateMesh()`, `MigrateObject()`: Moves meshes or global props between chunks, recalculating bounds, relative offsets, and GPU batches.
+  - `AutoMigrateMisplacedGeometry()`: 1-click batch migration resolving misplaced geometry across all loaded chunks.
+
 ### `ChunkValidator.h`
-Enforces PlayStation hardware constraints and `.IPD` layout rules:
+Enforces PlayStation hardware constraints, topology integrity, and `.IPD` layout rules:
 - **Constraints**: 1 world unit = 256 raw units, grid cell = 40.0 world units (10240 raw units), max height = 16.0 world units (4096 raw units), max overhang = 16 raw units, max vertices per mesh = 255 (PS1 uint8 index limit).
+- **Issue Types**: `HeightExceeded`, `HeightBelowMin`, `OverhangExceeded`, `VertexCapacityExceeded`, `VertexCapacityNearLimit`, `WrongChunkOwner`, `CrossChunkMesh`, `GlobalObjectMisplaced`, `InvalidVertexIndex`, `DegenerateFace`, `TextureIndexOutOfRange`.
 - **`ChunkValidator`**:
-  - `ValidateChunk(chunk)`: Validates entire chunk for vertex overflows, boundary violations, and height limits.
-  - `ValidateMesh(mesh, obj, chunk, objIdx, meshIdx)`: Validates single mesh within context.
-  - `ValidateVertexPosition(worldPos, xPos, yPos)`: Bounds checks for single points.
-  - `DetermineChunkGridPos()`, `DetermineChunkOwnerForMesh()`: Computes spatial ownership.
+  - `ValidateChunk(chunk, allLoadedChunks)`: Validates entire chunk for vertex overflows, boundary violations, height envelope, topology, and cross-chunk ownership.
+  - `ValidateObject(obj, chunk, objIdx, allLoadedChunks)`: Validates object meshes and global prop world anchor alignment.
+  - `ValidateMesh(mesh, obj, chunk, objIdx, meshIdx)`: Validates single mesh for vertex capacity, bounds, face index ranges, degenerate geometry, and texture indices.
+  - `ValidateVertexPosition(worldPos, xPos, yPos)`: Bounds and height envelope check for a single 3D point.
+  - `ValidateLoadedChunks(chunks)`: Multi-chunk validation pass across the active scene.
 
 ### `GlobalObjectOperations.h`
 Centralized operations for global `_GLB.PLM` prop instances in the `Geometry` namespace:
 - `RotateGlobalObject()`: 90° CW/CCW/180° yaw rotation with fixed-point matrix transformation.
 - `SnapGlobalObjectToFloor()`, `SnapGlobalObjectToGrid()`: Floor raycasting and grid alignment.
-- `DuplicateGlobalObject()`, `DeleteGlobalObject()`, `MirrorGlobalObject()`, `MoveGlobalObjectToChunk()`.
+- `DuplicateGlobalObject()`, `DeleteGlobalObject()`, `MirrorGlobalObject()`.
 
 ### `MeshOperations.h`
 Operations for local chunk meshes and object containers in the `Geometry` namespace:
 - `TranslateSelection()`: Unified translation for vertices, faces, and meshes with transactional undo and bounds checking.
 - `RotateMesh()`, `MirrorMesh()`: 90° axis rotation and axis mirroring with winding inversion.
 - `SnapMeshToFloor()`, `DuplicateMesh()`, `SeparateMeshToNewObject()`, `MergeMeshes()`, `DeleteMesh()`.
-- `RecalculateBounds()`, `CenterMeshPivot()`, `AddPrimitive()`, `MoveMeshToChunk()`.
+- `RecalculateBounds()`, `CenterMeshPivot()`, `AddPrimitive()`.
 
 ### `FaceOperations.h`
 Polygon topology, extrusion, winding, and UV mapping in the `Geometry` namespace:

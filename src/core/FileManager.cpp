@@ -107,30 +107,14 @@ void FileManager::ScanAssets() {
         if (entry.path().extension() == ".IPD" || entry.path().extension() == ".ipd") {
             std::string stem = entry.path().stem().string();
             std::string prefix = stem;
-            int x = 0, z = 0;
-            bool hasCoords = false;
-
-            if (stem.length() > 4) {
-                std::string rest = stem.substr(stem.length() - 4);
-                try {
-                    int x_hex = std::stoi(rest.substr(0, 2), nullptr, 16);
-                    int z_hex = std::stoi(rest.substr(2, 2), nullptr, 16);
-
-                    if (x_hex >= 128) x_hex -= 256;
-                    if (z_hex >= 128) z_hex -= 256;
-
-                    x = x_hex;
-                    z = z_hex;
-                    hasCoords = true;
-                    prefix = stem.substr(0, stem.length() - 4);
-                } catch (...) { }
-            }
+            int8_t x = 0, z = 0;
+            bool hasCoords = Core::ParseChunkName(stem, prefix, x, z);
 
             ChunkInfo info;
             info.name = stem;
             info.prefix = prefix;
-            info.x = x;
-            info.z = z;
+            info.x = static_cast<int>(x);
+            info.z = static_cast<int>(z);
             info.hasCoords = hasCoords;
             m_parsedChunks[prefix].push_back(info);
         }
