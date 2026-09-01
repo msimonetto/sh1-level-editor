@@ -3,15 +3,15 @@
 > [!NOTE]
 > **This project is in very early development!** Most features have not yet been implemented and serious level editing is not recommended at this stage.
 
-A C++ 3D geometry and level workstation for PlayStation 1 *Silent Hill* (1999) and its [unofficial PC Decompilation Port](https://github.com/SlickAmogus/silent-hill-decomp). Includes Python scripts that reproducibly convert proprietary formats (`.IPD`, `.PLM`, `.TIM`) **forwards and backwards!**
-
-In the project's current state, proprietary chunk formats (`.IPD`, `.PLM`) have been **successfully mapped out** and are **convertible** through either the dedicated ImGui editor or the included Python scripting. Parsers for these formats had existed and were importable in Blender or Noesis, but were not backwards convertible or dynamic around struct data size. Initial creation of these conversion tools centered around full-trip conversion and packing of game files into their original formats byte-to-byte exact from JSONs, which minimised uninterpretable raw binary data. **Direct in-memory editing** was later implemented to replace the JSON approach and takes place in the C++/ImGui editor, where geometry can be manipulated, added or removed while preserving file readability by the game engine. Modified chunk, texture/CLUT (`.TIM`) and UV data have been successfully written back into game files and are verified to be congruent with 3D viewport changes, and more advanced operations and verifications are included in the chunk editor. Geometry, UV maps and global object positioning are **editable**; collision data and textures are **viewable** in the editor and should be modifiable from within the level editor in the near future. Apart from chunk data, elements of **map-specific data** have been editable for the PC Port via C source code modification, such as points of interest, doors and waypoints, although those are unintuitive to edit currently.
-
-There is still a lot of further testing required, as I cannot claim any part of this is perfect. Naturally, **the results are real** and the interface is mostly intuitive, but **significantly more work is required before any serious level design is possible**. Given the need for rapid development and the complexity of the task, I have used AI assistance for early prototyping, research and a bulk of the editor. That being said, I have guided the AI considerably in applying my comprehension of the game engine, map files and PC Port into both research and the editor itself. I am hoping to rewrite this from the ground-up without AI assistance eventually.
-
-Applications of this may exist for the ongoing effort in developing the [PC Port](https://github.com/SlickAmogus/silent-hill-decomp) and extending the [overall decompilation project](https://github.com/shdecompilations/silent-hill-decomp), and of course with modding in general. As of August 2026, the decompilation project is mostly complete, but what is missing is full annotation and migration of binary overlay map data. 3D visualisation offered by the program may allow for cross-referencing between the binary layout and in-game points, as with camera occlusion objects or event handling in the PC Port. The chunk manager (2D grid on left panel) allows for aliases to be assigned easily, a 3D legend complements this, and the linkage between externally-placed rooms is viewable.
+A C++ 3D geometry and level workstation for PlayStation 1 *Silent Hill* (1999) and its [unofficial PC Decompilation Port](https://github.com/SlickAmogus/silent-hill-decomp). Reproducibly converts proprietary binary formats (`.IPD`, `.PLM`, `.TIM`) **forwards and backwards!**
 
 ![Demonstration](./docs/images/Demonstration.png)
+
+Proprietary chunk formats (`.IPD`, `.PLM`) have been **successfully mapped out** and are **convertible** through either the dedicated ImGui editor or the included Python scripting (which requires revision). This project developed from [the game's ongoing decompilation project](https://github.com/shdecompilations/silent-hill-decomp) for known binary data structures and an [earlier conversion tool](https://github.com/belek666/sh_ipd2obj) from chunk `.IPD` to Wavefront `.OBJ` files. It initially aimed to convert chunk data to-and-from JSONs while simultaneously minimising the uninterpretable raw binary sections, but it emerged into an editor/validator written in C++ to allow for more dynamic movement of structs and direct in-memory editing. Most core functionality has been introduced (asset management, geometry/texture editors), but validators are missing and the stability of the workflow has not been tested thoroughly.
+
+Further testing and rewrites of AI-assisted code is ongoing. AI has been used for early prototyping, research and a majority of the editor, but this will gradually be rewritten without AI assistance over time.
+
+**Applications**: As of August 2026, the decompilation project is mostly complete, but what is missing is full annotation and migration of binary overlay map data. 3D visualisation offered by the program may allow for cross-referencing between the binary layout and in-game points, as with camera occlusion walls or event handling in the PC Port. Setting aliases to chunks and visualising door connections may be of use as well.
 
 ---
 
@@ -23,18 +23,19 @@ Applications of this may exist for the ongoing effort in developing the [PC Port
     - **Waypoints**: Map-specific arrangements for doors (linkage to other rooms/maps), edits C source code for PC Port, untested in-game.
 - **Chunk Manager**: 2D viewer for workspace and game override management, assigning aliases to chunks, dynamic file table patching when adding new objects.
 - **Outliner**: Lists meshes and global geometry objects.
-- **Texture Map**: 2D selector for UV mapping, CLUT rows, texture file switching for selected faces, texture editing/importing will come later in a separate panel!
+- **Texture Map**: 2D selector for UV mapping, CLUT rows and textures for selected faces.
+- **Texture Edit**: Minimally implemented 2D pixel editor for TIM files, will allow conversions to-and-from PNGs soon. 
 - **Maps**: Currently minimal but editable, works in tandem with Waypoints viewport mode.
 - File management is automated based on chunk and prefix selection.
 
 ---
 
-## Current status
+## Current Status
 
 - **Unimplemented level design features**: Some of the level design elements haven't been implemented yet as of August 2026, but the core geometry (`.IPD`, `.PLM`), textures (`.TIM`) and chunk-specific collision (`.IPD`) are visualised correctly. The source code is modular enough to allow for easy future extension, allowing for discrete panels to be added.
 - **Unimplemented PSX support and binary overlay editing**: Only the PC Port has been integrated so far. No disc-image support currently exists, but this can be implemented relatively easily. For the PC Port, most of the engine patches (file table updates, waypoint data) are centered around replacing C source files (and indirectly DLLs) and regenerating a full PSX disc image takes several minutes. Conversion cycle back into binary overlays, alongside an alternate deployment routine would likely be necessary. Disc image checksums are virtually guaranteed to change after modification such that the [Silent Hill Map Examiner](https://github.com/ItEndsWithTens/SilentHillMapExaminer) plugin won't recognise the game as Silent Hill anymore.
 - **Unimplemented Linux or macOS support**: Currently only built around Windows due to the PC Port.
-- **Use of legacy Python scripts**: Some asset conversion operations currently rely on legacy Python scripts. These are fully functional but should be replaced with native C++ implementations in the future.
+- **Use of legacy Python scripts**: A small number of Python scripts are used, preventing the program from being exclusively contained as one executable and fully written in C++. The provided legacy Python scripts are outdated and miss certain conversion elements that the C++ editor does.
 
 ---
 
@@ -75,11 +76,10 @@ To playtest your level edits directly in the [PC Port](https://github.com/SlickA
 
 4. Edit the PC Port configuration (`game/PC/pc_port/build/config.cfg`) and set `allow_loose_files = 1` (and for diagnostic purposes, set `preload_chunks = 0` for in-game chunk reloading).
 
-5. Place a legally obtained copy of your Silent Hill 1 disc image (`SLUS-00707.bin` or `SLUS_007.07`) into:
-   `game/PC/pc_port/build/gamedata/SLUS-00707.bin`
+5. Place a legally obtained copy of your Silent Hill 1 disc image (`SLUS-00707.bin` or `SLUS_007.07`) into `game/PC/pc_port/build/gamedata/SLUS-00707.bin`.
 
 6. **Configure editor paths:**
-   In the editor under **Edit $\rightarrow$ Settings** (or via `config.json`):
+   In the editor's menu bar under **Edit >> Settings** (or via `config.json`):
    - **Project Directory:** Set to `data/` (or your preferred workspace path containing `workspace/` and `assets/`).
    - **Game Directory:** Set to `game/` (points to `game/PC` and its override directory for deploying level edits).
 
@@ -87,7 +87,7 @@ To playtest your level edits directly in the [PC Port](https://github.com/SlickA
 
 ## Contributing
 
-Contributions are more than welcome. I've outlined some important project principles in [`CONTRIBUTING.md`](CONTRIBUTING.md). As a summary, the project itself is fairly modular/abstracted to allow for simultaneous and easy development of new panels.
+Contributions are welcomed. Some project guidelines are outlined in [`CONTRIBUTING.md`](CONTRIBUTING.md). The project itself aims to be modular/abstracted to allow for simultaneous development of new panels.
 
 ---
 
