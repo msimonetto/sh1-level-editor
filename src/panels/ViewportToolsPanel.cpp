@@ -61,12 +61,12 @@ void ViewportToolsPanel::Draw(History *editHistory) {
     ImGui::Spacing();
 
     // 2. Active Viewport Link Status
-    if (m_activeViewport) {
-      ImGui::TextDisabled("Linked to: %s",
-                          m_activeViewport->GetPanelName().c_str());
-    } else {
-      ImGui::TextDisabled("No Viewport Linked");
-    }
+    // if (m_activeViewport) {
+    //   ImGui::TextDisabled("Linked to: %s",
+    //                       m_activeViewport->GetPanelName().c_str());
+    // } else {
+    //   ImGui::TextDisabled("No Viewport Linked");
+    // }
 
     ImGui::Separator();
 

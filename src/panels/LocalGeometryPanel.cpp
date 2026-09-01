@@ -70,58 +70,58 @@ void LocalGeometryPanel::DrawSelectionHeader(LocalGeometryOverlay &overlay) {
   if (isVert) ImGui::PopStyleColor();
 
   // 2. Dynamic Context Badge
-  ImGui::Spacing();
-  if (!overlay.m_selectedChunk.empty()) {
-    std::string statsStr = "Chunk: " + overlay.m_selectedChunk;
+  // ImGui::Spacing();
+  // if (!overlay.m_selectedChunk.empty()) {
+  //   std::string statsStr = "Chunk: " + overlay.m_selectedChunk;
 
-    const RenderObject *selectedObj = nullptr;
-    for (const auto &lc : overlay.GetChunks()) {
-      if (lc.data->chunkName == overlay.m_selectedChunk &&
-          overlay.m_selectedObjectIdx >= 0 &&
-          overlay.m_selectedObjectIdx < (int)lc.data->objects.size()) {
-        selectedObj = &lc.data->objects[overlay.m_selectedObjectIdx];
-        break;
-      }
-    }
+  //   const RenderObject *selectedObj = nullptr;
+  //   for (const auto &lc : overlay.GetChunks()) {
+  //     if (lc.data->chunkName == overlay.m_selectedChunk &&
+  //         overlay.m_selectedObjectIdx >= 0 &&
+  //         overlay.m_selectedObjectIdx < (int)lc.data->objects.size()) {
+  //       selectedObj = &lc.data->objects[overlay.m_selectedObjectIdx];
+  //       break;
+  //     }
+  //   }
 
-    if (overlay.m_editMode == EditMode::GlobalObject) {
-      if (selectedObj && selectedObj->isGlobal) {
-        statsStr += " | Prop: " + selectedObj->name + " (Obj #" + std::to_string(overlay.m_selectedObjectIdx) + ")";
-        float px = (float)selectedObj->rawTx / 256.0f;
-        float py = -(float)selectedObj->rawTy / 256.0f;
-        float pz = -(float)selectedObj->rawTz / 256.0f;
-        char posBuf[64];
-        sprintf(posBuf, " | Pos: (%.1f, %.1f, %.1f)", px, py, pz);
-        statsStr += posBuf;
-      } else {
-        statsStr += " | No global prop selected";
-      }
-      ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.9f, 1.0f), "%s", statsStr.c_str());
-    } else if (overlay.m_editMode == EditMode::Mesh) {
-      if (selectedObj && !selectedObj->isGlobal) {
-        statsStr += " | Mesh Obj #" + std::to_string(overlay.m_selectedObjectIdx);
-        if (overlay.m_selectedMeshIdx >= 0 && overlay.m_selectedMeshIdx < (int)selectedObj->meshes.size()) {
-          const auto &m = selectedObj->meshes[overlay.m_selectedMeshIdx];
-          statsStr += " (" + std::to_string(m.vx.size()) + " Verts, " + std::to_string(m.faces.size()) + " Faces)";
-        }
-      } else {
-        statsStr += " | No local mesh selected";
-      }
-      ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", statsStr.c_str());
-    } else if (overlay.m_editMode == EditMode::Face) {
-      size_t faceCount = overlay.m_selectedFaces.size();
-      if (faceCount == 0 && overlay.m_selectedFaceIdx >= 0) faceCount = 1;
-      statsStr += " | Selected: " + std::to_string(faceCount) + " Face(s)";
-      ImGui::TextColored(ImVec4(0.5f, 0.9f, 0.5f, 1.0f), "%s", statsStr.c_str());
-    } else if (overlay.m_editMode == EditMode::Vertex) {
-      size_t vertCount = overlay.m_selectedVertices.size();
-      if (vertCount == 0 && overlay.m_selectedVertexIdx >= 0) vertCount = 1;
-      statsStr += " | Selected: " + std::to_string(vertCount) + " Vertex(es)";
-      ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", statsStr.c_str());
-    }
-  } else {
-    ImGui::TextDisabled("No chunk selected.");
-  }
+  //   if (overlay.m_editMode == EditMode::GlobalObject) {
+  //     if (selectedObj && selectedObj->isGlobal) {
+  //       statsStr += " | Prop: " + selectedObj->name + " (Obj #" + std::to_string(overlay.m_selectedObjectIdx) + ")";
+  //       float px = (float)selectedObj->rawTx / 256.0f;
+  //       float py = -(float)selectedObj->rawTy / 256.0f;
+  //       float pz = -(float)selectedObj->rawTz / 256.0f;
+  //       char posBuf[64];
+  //       sprintf(posBuf, " | Pos: (%.1f, %.1f, %.1f)", px, py, pz);
+  //       statsStr += posBuf;
+  //     } else {
+  //       statsStr += " | No global prop selected";
+  //     }
+  //     ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.9f, 1.0f), "%s", statsStr.c_str());
+  //   } else if (overlay.m_editMode == EditMode::Mesh) {
+  //     if (selectedObj && !selectedObj->isGlobal) {
+  //       statsStr += " | Mesh Obj #" + std::to_string(overlay.m_selectedObjectIdx);
+  //       if (overlay.m_selectedMeshIdx >= 0 && overlay.m_selectedMeshIdx < (int)selectedObj->meshes.size()) {
+  //         const auto &m = selectedObj->meshes[overlay.m_selectedMeshIdx];
+  //         statsStr += " (" + std::to_string(m.vx.size()) + " Verts, " + std::to_string(m.faces.size()) + " Faces)";
+  //       }
+  //     } else {
+  //       statsStr += " | No local mesh selected";
+  //     }
+  //     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", statsStr.c_str());
+  //   } else if (overlay.m_editMode == EditMode::Face) {
+  //     size_t faceCount = overlay.m_selectedFaces.size();
+  //     if (faceCount == 0 && overlay.m_selectedFaceIdx >= 0) faceCount = 1;
+  //     statsStr += " | Selected: " + std::to_string(faceCount) + " Face(s)";
+  //     ImGui::TextColored(ImVec4(0.5f, 0.9f, 0.5f, 1.0f), "%s", statsStr.c_str());
+  //   } else if (overlay.m_editMode == EditMode::Vertex) {
+  //     size_t vertCount = overlay.m_selectedVertices.size();
+  //     if (vertCount == 0 && overlay.m_selectedVertexIdx >= 0) vertCount = 1;
+  //     statsStr += " | Selected: " + std::to_string(vertCount) + " Vertex(es)";
+  //     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", statsStr.c_str());
+  //   }
+  // } else {
+  //   ImGui::TextDisabled("No chunk selected.");
+  // }
 
   // 3. Move Step (Power of 2 grid snap)
   ImGui::Spacing();
@@ -134,9 +134,9 @@ void LocalGeometryPanel::DrawSelectionHeader(LocalGeometryOverlay &overlay) {
     sprintf(stepBuf, "1/%d m (%d raw)", (int)round(1.0f / meterUnits), rawUnits);
   }
 
-  ImGui::Text("Grid Snap:");
+  ImGui::Text("Quantize:");
   ImGui::SameLine();
-  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 160.0f);
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 120.0f);
   ImGui::SliderInt("##MoveStep", &overlay.m_moveStepPower, 0, 10, stepBuf);
 
   // Quick preset snap buttons
@@ -145,7 +145,7 @@ void LocalGeometryPanel::DrawSelectionHeader(LocalGeometryOverlay &overlay) {
   ImGui::SameLine();
   if (ImGui::Button("1/4"))  overlay.m_moveStepPower = 6; // 64 raw = 1/4m
   ImGui::SameLine();
-  if (ImGui::Button("1.0"))  overlay.m_moveStepPower = 8; // 256 raw = 1m
+  if (ImGui::Button("1/1"))  overlay.m_moveStepPower = 8; // 256 raw = 1m
 }
 
 void LocalGeometryPanel::DrawGlobalObjectsSection(LocalGeometryOverlay &overlay, History *history) {
@@ -153,18 +153,103 @@ void LocalGeometryPanel::DrawGlobalObjectsSection(LocalGeometryOverlay &overlay,
   float halfW = (availW - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
   float thirdW = (availW - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
 
-  if (ImGui::CollapsingHeader(ICON_FA_GLOBE " Global Prop Transforms", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::Text("Yaw Rotation (90°):");
-    if (ImGui::Button(ICON_FA_ROTATE_LEFT " -90° (CCW)", ImVec2(thirdW, 0))) {
+  const RenderObject *activeObj = nullptr;
+  for (const auto &lcConst : overlay.GetChunks()) {
+    if (lcConst.data->chunkName == overlay.m_selectedChunk) {
+      if (overlay.m_selectedObjectIdx >= 0 &&
+          overlay.m_selectedObjectIdx < (int)lcConst.data->objects.size()) {
+        if (lcConst.data->objects[overlay.m_selectedObjectIdx].isGlobal) {
+          activeObj = &lcConst.data->objects[overlay.m_selectedObjectIdx];
+        }
+      }
+      break;
+    }
+  }
+
+  if (!activeObj) {
+    ImGui::Spacing();
+    ImGui::TextDisabled("No global prop selected.");
+    ImGui::TextDisabled("Click on a prop in the viewport to inspect and transform it.");
+    return;
+  }
+
+  if (ImGui::CollapsingHeader(ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT " Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.9f, 1.0f), "%s (Obj #%d)", activeObj->name.c_str(), overlay.m_selectedObjectIdx);
+    ImGui::Spacing();
+
+    // 1. Position (m)
+    ImGui::Text("Position (m):");
+    float curPos[3] = {
+      (float)activeObj->rawTx / 256.0f,
+      -(float)activeObj->rawTy / 256.0f,
+      -(float)activeObj->rawTz / 256.0f
+    };
+    float newPos[3] = { curPos[0], curPos[1], curPos[2] };
+
+    float step = (float)(1 << overlay.m_moveStepPower) / 256.0f;
+    if (step <= 0.0f) step = 0.0625f;
+
+    ImGui::PushItemWidth(thirdW);
+    bool posChanged = false;
+    posChanged |= ImGui::DragFloat("##PosX", &newPos[0], step, -10000.0f, 10000.0f, "X: %.3f");
+    ImGui::SameLine();
+    posChanged |= ImGui::DragFloat("##PosY", &newPos[1], step, -10000.0f, 10000.0f, "Y: %.3f");
+    ImGui::SameLine();
+    posChanged |= ImGui::DragFloat("##PosZ", &newPos[2], step, -10000.0f, 10000.0f, "Z: %.3f");
+    ImGui::PopItemWidth();
+
+    if (posChanged) {
+      Vector3 delta = { newPos[0] - curPos[0], newPos[1] - curPos[1], newPos[2] - curPos[2] };
+      Geometry::TranslateGlobalObject(overlay, delta, history);
+    }
+
+    ImGui::Spacing();
+
+    // 2. Rotation (Pitch, Yaw, Roll in Degrees)
+    ImGui::Text("Rotation (°):");
+    float pitch = 0.0f, yaw = 0.0f, roll = 0.0f;
+    Geometry::GetGlobalObjectRotation(overlay, pitch, yaw, roll);
+    float rot[3] = { pitch, yaw, roll };
+
+    ImGui::PushItemWidth(thirdW);
+    bool rotChanged = false;
+    rotChanged |= ImGui::DragFloat("##Pitch", &rot[0], 1.0f, -180.0f, 180.0f, "P: %.1f°");
+    ImGui::SameLine();
+    rotChanged |= ImGui::DragFloat("##Yaw",   &rot[1], 1.0f, -180.0f, 180.0f, "Y: %.1f°");
+    ImGui::SameLine();
+    rotChanged |= ImGui::DragFloat("##Roll",  &rot[2], 1.0f, -180.0f, 180.0f, "R: %.1f°");
+    ImGui::PopItemWidth();
+
+    if (rotChanged) {
+      Geometry::SetGlobalObjectRotation(overlay, rot[0], rot[1], rot[2], history);
+    }
+
+    // Quick Cardinal Yaw Buttons
+    ImGui::Spacing();
+    ImGui::Text("Quick Yaw (90°):");
+    if (ImGui::Button(ICON_FA_ARROW_ROTATE_LEFT " -90° (CCW)", ImVec2(halfW, 0))) {
       Geometry::RotateGlobalObject(overlay, -1, history);
     }
     ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_ROTATE_RIGHT " +90° (CW)", ImVec2(thirdW, 0))) {
+    if (ImGui::Button(ICON_FA_ARROW_ROTATE_RIGHT " +90° (CW)", ImVec2(halfW, 0))) {
       Geometry::RotateGlobalObject(overlay, +1, history);
     }
+
+    if (ImGui::Button(ICON_FA_ARROWS_ROTATE " Reset Rotation (0°)", ImVec2(availW, 0))) {
+      Geometry::SetGlobalObjectRotation(overlay, 0.0f, 0.0f, 0.0f, history);
+    }
+
+    ImGui::Spacing();
+  }
+
+  if (ImGui::CollapsingHeader(ICON_FA_SLIDERS " Operations & Snapping", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Text("Snapping:");
+    if (ImGui::Button(ICON_FA_MAGNET " Snap to Grid", ImVec2(halfW, 0))) {
+      Geometry::SnapGlobalObjectToGrid(overlay, history);
+    }
     ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_ARROWS_ROTATE " 180°", ImVec2(thirdW, 0))) {
-      Geometry::RotateGlobalObject(overlay, +2, history);
+    if (ImGui::Button(ICON_FA_ARROW_DOWN " Snap to Floor", ImVec2(halfW, 0))) {
+      Geometry::SnapGlobalObjectToFloor(overlay, history);
     }
 
     ImGui::Spacing();
@@ -179,16 +264,6 @@ void LocalGeometryPanel::DrawGlobalObjectsSection(LocalGeometryOverlay &overlay,
     ImGui::SameLine();
     if (ImGui::Button("Mirror Z", ImVec2(thirdW, 0))) {
       Geometry::MirrorGlobalObject(overlay, 2, history);
-    }
-
-    ImGui::Spacing();
-    ImGui::Text("Snapping:");
-    if (ImGui::Button(ICON_FA_MAGNET " Snap to Grid", ImVec2(halfW, 0))) {
-      Geometry::SnapGlobalObjectToGrid(overlay, history);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_ARROW_DOWN " Snap to Floor (Y=0)", ImVec2(halfW, 0))) {
-      Geometry::SnapGlobalObjectToFloor(overlay, history);
     }
 
     ImGui::Spacing();

@@ -9,11 +9,18 @@
 // ---------------------------------------------------------------------------
 struct MeshSnapshot {
   std::string chunkName;
-  int objectIdx;
-  int meshIdx;
+  int objectIdx = -1;
+  int meshIdx = -1;
   RenderMesh before;
   RenderMesh after;
   std::string description;
+
+  // Object-level transform state (used for global props & object-level operations)
+  bool hasObjectTransform = false;
+  int32_t rawTxBefore = 0, rawTyBefore = 0, rawTzBefore = 0;
+  int32_t rawTxAfter = 0, rawTyAfter = 0, rawTzAfter = 0;
+  int16_t rtBefore[3][3] = {{0}};
+  int16_t rtAfter[3][3] = {{0}};
 };
 
 // ---------------------------------------------------------------------------
@@ -89,7 +96,7 @@ private:
   static void ApplyMesh(class Viewport &vp,
                         class LocalGeometryOverlay &evp,
                         const std::string &workspaceDir,
-                        const MeshSnapshot &snap, const RenderMesh &state);
+                        const MeshSnapshot &snap, bool useBeforeState);
 
   static void ApplyOverlay(class WaypointsOverlay *eventVp,
                            const OverlaySnapshot &snap, bool useBeforeState);

@@ -115,7 +115,7 @@ OS-native file and directory picker dialogs.
 
 ### `History.h`
 Unified transactional undo/redo engine using deep snapshots across 3D meshes and map overlays.
-- **`MeshSnapshot`**: Before/after state snapshot of a `RenderMesh` with chunk name, object index, and mesh index.
+- **`MeshSnapshot`**: Before/after state snapshot of a `RenderMesh` and optional object transform (`rawTx`, `rawTy`, `rawTz`, `rt`) with chunk name, object index, and mesh index.
 - **`OverlaySnapshot`**: Before/after state snapshot of an `OverlayMapData` structure.
 - **`EditRecord`**: Tagged union holding either a `MeshSnapshot` or an `OverlaySnapshot`.
 - **`History`**:

@@ -95,6 +95,10 @@ std::string History::GetMeshTargetSignature(const MeshSnapshot &snap) {
   std::string sig = snap.chunkName + ":" + std::to_string(snap.objectIdx) +
                     ":" + std::to_string(snap.meshIdx) + "|";
 
+  if (snap.hasObjectTransform) {
+    sig += "TRANS;";
+  }
+
   const auto &va = snap.before;
   const auto &vb = snap.after;
 
@@ -234,7 +238,14 @@ bool History::CanMerge(const EditRecord &a, const EditRecord &b) {
 
 // ---------------------------------------------------------------------------
 void History::Push(MeshSnapshot snap) {
-  if (IsEqual(snap.before, snap.after))
+  bool meshEqual = IsEqual(snap.before, snap.after);
+  bool transformEqual = !snap.hasObjectTransform ||
+                        (snap.rawTxBefore == snap.rawTxAfter &&
+                         snap.rawTyBefore == snap.rawTyAfter &&
+                         snap.rawTzBefore == snap.rawTzAfter &&
+                         memcmp(snap.rtBefore, snap.rtAfter, sizeof(snap.rtBefore)) == 0);
+
+  if (meshEqual && transformEqual)
     return;
   m_redo.clear();
 
@@ -244,7 +255,19 @@ void History::Push(MeshSnapshot snap) {
 
   if (!m_undo.empty() && CanMerge(m_undo.back(), rec)) {
     m_undo.back().meshSnap.after = std::move(rec.meshSnap.after);
-    if (IsEqual(m_undo.back().meshSnap.before, m_undo.back().meshSnap.after)) {
+    if (rec.meshSnap.hasObjectTransform) {
+      m_undo.back().meshSnap.rawTxAfter = rec.meshSnap.rawTxAfter;
+      m_undo.back().meshSnap.rawTyAfter = rec.meshSnap.rawTyAfter;
+      m_undo.back().meshSnap.rawTzAfter = rec.meshSnap.rawTzAfter;
+      memcpy(m_undo.back().meshSnap.rtAfter, rec.meshSnap.rtAfter, sizeof(rec.meshSnap.rtAfter));
+    }
+    bool mergedMeshEqual = IsEqual(m_undo.back().meshSnap.before, m_undo.back().meshSnap.after);
+    bool mergedTransformEqual = !m_undo.back().meshSnap.hasObjectTransform ||
+                                (m_undo.back().meshSnap.rawTxBefore == m_undo.back().meshSnap.rawTxAfter &&
+                                 m_undo.back().meshSnap.rawTyBefore == m_undo.back().meshSnap.rawTyAfter &&
+                                 m_undo.back().meshSnap.rawTzBefore == m_undo.back().meshSnap.rawTzAfter &&
+                                 memcmp(m_undo.back().meshSnap.rtBefore, m_undo.back().meshSnap.rtAfter, sizeof(m_undo.back().meshSnap.rtBefore)) == 0);
+    if (mergedMeshEqual && mergedTransformEqual) {
       m_undo.pop_back();
     }
     return;
@@ -300,27 +323,59 @@ RenderMesh *History::FindLiveMesh(const std::vector<LoadedChunk> &chunks,
 // ---------------------------------------------------------------------------
 void History::ApplyMesh(Viewport &vp, LocalGeometryOverlay &evp,
                         const std::string &workspaceDir,
-                        const MeshSnapshot &snap, const RenderMesh &state) {
+                        const MeshSnapshot &snap, bool useBeforeState) {
+  const RenderMesh &state = useBeforeState ? snap.before : snap.after;
   printf("[History] ApplyMesh to chunk: %s, obj: %d, mesh: %d (Target "
          "vertices: %zu)\n",
          snap.chunkName.c_str(), snap.objectIdx, snap.meshIdx, state.vx.size());
 
-  RenderMesh *liveVp = FindLiveMesh(vp.GetChunks(), snap);
-  if (liveVp) {
-    *liveVp = state;
-    vp.RebuildChunkBatches(snap.chunkName, workspaceDir);
-    printf("[History] Successfully applied to Viewport.\n");
-  } else {
-    printf("[History] WARNING: liveVp not found in Viewport.\n");
-  }
+  auto applyToChunks = [&](const std::vector<LoadedChunk> &chunksConst, const char *targetName) {
+    auto &chunks = const_cast<std::vector<LoadedChunk> &>(chunksConst);
+    for (auto &lc : chunks) {
+      if (lc.data->chunkName != snap.chunkName)
+        continue;
+      if (snap.objectIdx < 0 || snap.objectIdx >= (int)lc.data->objects.size())
+        continue;
+      auto &obj = lc.data->objects[snap.objectIdx];
+      if (snap.meshIdx >= 0 && snap.meshIdx < (int)obj.meshes.size()) {
+        obj.meshes[snap.meshIdx] = state;
+      }
+      if (snap.hasObjectTransform) {
+        if (useBeforeState) {
+          obj.rawTx = snap.rawTxBefore;
+          obj.rawTy = snap.rawTyBefore;
+          obj.rawTz = snap.rawTzBefore;
+          memcpy(obj.rt, snap.rtBefore, sizeof(obj.rt));
+        } else {
+          obj.rawTx = snap.rawTxAfter;
+          obj.rawTy = snap.rawTyAfter;
+          obj.rawTz = snap.rawTzAfter;
+          memcpy(obj.rt, snap.rtAfter, sizeof(obj.rt));
+        }
+      }
+      obj.bounds = {{99999.0f, 99999.0f, 99999.0f}, {-99999.0f, -99999.0f, -99999.0f}};
+      for (const auto &m : obj.meshes) {
+        for (size_t i = 0; i < m.vx.size(); ++i) {
+          obj.bounds.min.x = std::min(obj.bounds.min.x, m.vx[i]);
+          obj.bounds.min.y = std::min(obj.bounds.min.y, m.vy[i]);
+          obj.bounds.min.z = std::min(obj.bounds.min.z, m.vz[i]);
+          obj.bounds.max.x = std::max(obj.bounds.max.x, m.vx[i]);
+          obj.bounds.max.y = std::max(obj.bounds.max.y, m.vy[i]);
+          obj.bounds.max.z = std::max(obj.bounds.max.z, m.vz[i]);
+        }
+      }
+      printf("[History] Successfully applied to %s.\n", targetName);
+      return true;
+    }
+    printf("[History] WARNING: target object not found in %s.\n", targetName);
+    return false;
+  };
 
-  RenderMesh *liveEvp = FindLiveMesh(evp.GetChunks(), snap);
-  if (liveEvp) {
-    *liveEvp = state;
+  if (applyToChunks(vp.GetChunks(), "Viewport")) {
+    vp.RebuildChunkBatches(snap.chunkName, workspaceDir);
+  }
+  if (applyToChunks(evp.GetChunks(), "LocalGeometryOverlay")) {
     evp.RebuildChunkBatches(snap.chunkName, workspaceDir);
-    printf("[History] Successfully applied to LocalGeometryOverlay.\n");
-  } else {
-    printf("[History] WARNING: liveEvp not found in LocalGeometryOverlay.\n");
   }
 }
 
@@ -360,7 +415,7 @@ bool History::Undo(Viewport &vp, LocalGeometryOverlay &evp,
   m_undo.pop_back();
 
   if (record.type == EditType::Mesh) {
-    ApplyMesh(vp, evp, workspaceDir, record.meshSnap, record.meshSnap.before);
+    ApplyMesh(vp, evp, workspaceDir, record.meshSnap, true);
     printf("[History] Undo Mesh: %s\n",
            record.meshSnap.description.c_str());
   } else if (record.type == EditType::Overlay) {
@@ -372,8 +427,19 @@ bool History::Undo(Viewport &vp, LocalGeometryOverlay &evp,
   if (!m_redo.empty() && CanMerge(m_redo.back(), record)) {
     if (record.type == EditType::Mesh) {
       m_redo.back().meshSnap.before = std::move(record.meshSnap.before);
-      if (IsEqual(m_redo.back().meshSnap.before,
-                  m_redo.back().meshSnap.after)) {
+      if (record.meshSnap.hasObjectTransform) {
+        m_redo.back().meshSnap.rawTxBefore = record.meshSnap.rawTxBefore;
+        m_redo.back().meshSnap.rawTyBefore = record.meshSnap.rawTyBefore;
+        m_redo.back().meshSnap.rawTzBefore = record.meshSnap.rawTzBefore;
+        memcpy(m_redo.back().meshSnap.rtBefore, record.meshSnap.rtBefore, sizeof(record.meshSnap.rtBefore));
+      }
+      bool noMesh = IsEqual(m_redo.back().meshSnap.before, m_redo.back().meshSnap.after);
+      bool noTrans = !m_redo.back().meshSnap.hasObjectTransform ||
+                     (m_redo.back().meshSnap.rawTxBefore == m_redo.back().meshSnap.rawTxAfter &&
+                      m_redo.back().meshSnap.rawTyBefore == m_redo.back().meshSnap.rawTyAfter &&
+                      m_redo.back().meshSnap.rawTzBefore == m_redo.back().meshSnap.rawTzAfter &&
+                      memcmp(m_redo.back().meshSnap.rtBefore, m_redo.back().meshSnap.rtAfter, sizeof(m_redo.back().meshSnap.rtBefore)) == 0);
+      if (noMesh && noTrans) {
         m_redo.pop_back();
       }
     } else {
@@ -399,7 +465,7 @@ bool History::Redo(Viewport &vp, LocalGeometryOverlay &evp,
   m_redo.pop_back();
 
   if (record.type == EditType::Mesh) {
-    ApplyMesh(vp, evp, workspaceDir, record.meshSnap, record.meshSnap.after);
+    ApplyMesh(vp, evp, workspaceDir, record.meshSnap, false);
     printf("[History] Redo Mesh: %s\n",
            record.meshSnap.description.c_str());
   } else if (record.type == EditType::Overlay) {
@@ -411,8 +477,19 @@ bool History::Redo(Viewport &vp, LocalGeometryOverlay &evp,
   if (!m_undo.empty() && CanMerge(m_undo.back(), record)) {
     if (record.type == EditType::Mesh) {
       m_undo.back().meshSnap.after = std::move(record.meshSnap.after);
-      if (IsEqual(m_undo.back().meshSnap.before,
-                  m_undo.back().meshSnap.after)) {
+      if (record.meshSnap.hasObjectTransform) {
+        m_undo.back().meshSnap.rawTxAfter = record.meshSnap.rawTxAfter;
+        m_undo.back().meshSnap.rawTyAfter = record.meshSnap.rawTyAfter;
+        m_undo.back().meshSnap.rawTzAfter = record.meshSnap.rawTzAfter;
+        memcpy(m_undo.back().meshSnap.rtAfter, record.meshSnap.rtAfter, sizeof(record.meshSnap.rtAfter));
+      }
+      bool noMesh = IsEqual(m_undo.back().meshSnap.before, m_undo.back().meshSnap.after);
+      bool noTrans = !m_undo.back().meshSnap.hasObjectTransform ||
+                     (m_undo.back().meshSnap.rawTxAfter == m_undo.back().meshSnap.rawTxBefore &&
+                      m_undo.back().meshSnap.rawTyAfter == m_undo.back().meshSnap.rawTyBefore &&
+                      m_undo.back().meshSnap.rawTzAfter == m_undo.back().meshSnap.rawTzBefore &&
+                      memcmp(m_undo.back().meshSnap.rtAfter, m_undo.back().meshSnap.rtBefore, sizeof(m_undo.back().meshSnap.rtAfter)) == 0);
+      if (noMesh && noTrans) {
         m_undo.pop_back();
       }
     } else {

@@ -1,4 +1,5 @@
 #include "geometry/GlobalObjectOperations.h"
+#include "geometry/TransformOperations.h"
 #include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "formats/IPDParse.h"
@@ -7,10 +8,13 @@
 #include "raymath.h"
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <algorithm>
 #include <filesystem>
 
 namespace Geometry {
+
+// --- Private Helpers ---
 
 static std::string GetWorkspaceDir(const LocalGeometryOverlay& overlay) {
     if (std::filesystem::exists(overlay.m_lastWorkspaceDir))
@@ -22,7 +26,7 @@ static std::string GetWorkspaceDir(const LocalGeometryOverlay& overlay) {
     return overlay.m_lastWorkspaceDir;
 }
 
-static bool GetActiveGlobalObject(LocalGeometryOverlay& overlay,
+static bool GetActiveGlobalObject(const LocalGeometryOverlay& overlay,
                                   LoadedChunk*& outChunk,
                                   RenderObject*& outObj) {
     if (overlay.m_selectedChunk.empty() || overlay.m_selectedObjectIdx < 0)
@@ -43,6 +47,28 @@ static bool GetActiveGlobalObject(LocalGeometryOverlay& overlay,
         }
     }
     return false;
+}
+
+static Vector3 GetGlobalObjectWorldAnchor(const LoadedChunk& lc, const RenderObject& obj) {
+    return {
+        ((float)obj.rawTx + 10240.0f * (float)lc.data->xPos) * (1.0f / 256.0f),
+        -((float)obj.rawTy) * (1.0f / 256.0f),
+        -((float)obj.rawTz + 10240.0f * (float)lc.data->yPos) * (1.0f / 256.0f)
+    };
+}
+
+static void RecalculateObjectBounds(RenderObject& obj) {
+    obj.bounds = {{99999.0f, 99999.0f, 99999.0f}, {-99999.0f, -99999.0f, -99999.0f}};
+    for (const auto& mesh : obj.meshes) {
+        for (size_t i = 0; i < mesh.vx.size(); ++i) {
+            obj.bounds.min.x = std::min(obj.bounds.min.x, mesh.vx[i]);
+            obj.bounds.min.y = std::min(obj.bounds.min.y, mesh.vy[i]);
+            obj.bounds.min.z = std::min(obj.bounds.min.z, mesh.vz[i]);
+            obj.bounds.max.x = std::max(obj.bounds.max.x, mesh.vx[i]);
+            obj.bounds.max.y = std::max(obj.bounds.max.y, mesh.vy[i]);
+            obj.bounds.max.z = std::max(obj.bounds.max.z, mesh.vz[i]);
+        }
+    }
 }
 
 static float FindFloorHeightBelow(const LocalGeometryOverlay& overlay, float worldX, float worldZ, float startY, const std::string& ignoreChunk, int ignoreObjIdx) {
@@ -85,24 +111,18 @@ static float FindFloorHeightBelow(const LocalGeometryOverlay& overlay, float wor
     return highestFloorY;
 }
 
-bool RotateGlobalObject(LocalGeometryOverlay& overlay, int yawSteps, History* history) {
+// Transactional wrapper that manages object resolution, history snapshotting, bounds recalculation, and batch rebuilding
+template <typename MutateFn>
+static bool ModifyActiveGlobalObject(LocalGeometryOverlay& overlay,
+                                     History* history,
+                                     const std::string& actionDesc,
+                                     MutateFn&& mutate)
+{
     LoadedChunk* lc = nullptr;
     RenderObject* obj = nullptr;
     if (!GetActiveGlobalObject(overlay, lc, obj))
         return false;
 
-    float angleRad = (float)yawSteps * (PI * 0.5f);
-    float cosA = cosf(angleRad);
-    float sinA = sinf(angleRad);
-
-    // Calculate world origin of the instance
-    Vector3 origin = {
-        ((float)obj->rawTx + 10240.0f * (float)lc->data->xPos) * (1.0f / 256.0f),
-        -((float)obj->rawTy) * (1.0f / 256.0f),
-        -((float)obj->rawTz + 10240.0f * (float)lc->data->yPos) * (1.0f / 256.0f)
-    };
-
-    // Before snapshot
     MeshSnapshot snap;
     if (history) {
         snap.chunkName = lc->data->chunkName;
@@ -111,169 +131,201 @@ bool RotateGlobalObject(LocalGeometryOverlay& overlay, int yawSteps, History* hi
         if (!obj->meshes.empty()) {
             snap.before = obj->meshes[0];
         }
-        snap.description = "Rotate Global Prop " + obj->name;
+        snap.hasObjectTransform = true;
+        snap.rawTxBefore = obj->rawTx;
+        snap.rawTyBefore = obj->rawTy;
+        snap.rawTzBefore = obj->rawTz;
+        memcpy(snap.rtBefore, obj->rt, sizeof(obj->rt));
+        snap.description = actionDesc + " " + obj->name;
     }
 
-    // Rotate all vertices in all meshes around origin
-    obj->bounds = {{99999.0f, 99999.0f, 99999.0f}, {-99999.0f, -99999.0f, -99999.0f}};
-    for (auto& mesh : obj->meshes) {
-        for (size_t i = 0; i < mesh.vx.size(); ++i) {
-            float dx = mesh.vx[i] - origin.x;
-            float dz = mesh.vz[i] - origin.z;
+    if (!mutate(*lc, *obj))
+        return false;
 
-            mesh.vx[i] = origin.x + dx * cosA - dz * sinA;
-            mesh.vz[i] = origin.z + dx * sinA + dz * cosA;
-
-            obj->bounds.min.x = std::min(obj->bounds.min.x, mesh.vx[i]);
-            obj->bounds.min.y = std::min(obj->bounds.min.y, mesh.vy[i]);
-            obj->bounds.min.z = std::min(obj->bounds.min.z, mesh.vz[i]);
-            obj->bounds.max.x = std::max(obj->bounds.max.x, mesh.vx[i]);
-            obj->bounds.max.y = std::max(obj->bounds.max.y, mesh.vy[i]);
-            obj->bounds.max.z = std::max(obj->bounds.max.z, mesh.vz[i]);
-        }
-    }
-
-    // Update 3x3 rotation matrix (4096 fixed-point)
-    // R_new = R_yaw * R_old
-    int16_t oldRt[3][3];
-    memcpy(oldRt, obj->rt, sizeof(oldRt));
-    int c4096 = (int)round(cosA * 4096.0f);
-    int s4096 = (int)round(sinA * 4096.0f);
-
-    obj->rt[0][0] = (int16_t)((c4096 * oldRt[0][0] - s4096 * oldRt[2][0]) >> 12);
-    obj->rt[0][1] = (int16_t)((c4096 * oldRt[0][1] - s4096 * oldRt[2][1]) >> 12);
-    obj->rt[0][2] = (int16_t)((c4096 * oldRt[0][2] - s4096 * oldRt[2][2]) >> 12);
-
-    obj->rt[2][0] = (int16_t)((s4096 * oldRt[0][0] + c4096 * oldRt[2][0]) >> 12);
-    obj->rt[2][1] = (int16_t)((s4096 * oldRt[0][1] + c4096 * oldRt[2][1]) >> 12);
-    obj->rt[2][2] = (int16_t)((s4096 * oldRt[0][2] + c4096 * oldRt[2][2]) >> 12);
+    RecalculateObjectBounds(*obj);
 
     if (history && !obj->meshes.empty()) {
         snap.after = obj->meshes[0];
+        snap.rawTxAfter = obj->rawTx;
+        snap.rawTyAfter = obj->rawTy;
+        snap.rawTzAfter = obj->rawTz;
+        memcpy(snap.rtAfter, obj->rt, sizeof(obj->rt));
         history->Push(std::move(snap));
     }
 
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
+    overlay.RebuildChunkBatches(lc->data->chunkName, GetWorkspaceDir(overlay));
     return true;
+}
+
+// --- Public Operations ---
+
+bool GetGlobalObjectRotation(const LocalGeometryOverlay& overlay, float& pitch, float& yaw, float& roll) {
+    LoadedChunk* lc = nullptr;
+    RenderObject* obj = nullptr;
+    if (!GetActiveGlobalObject(overlay, lc, obj))
+        return false;
+
+    ConvertRotationMatrixToEuler(obj->rt, pitch, yaw, roll);
+    return true;
+}
+
+bool SetGlobalObjectRotation(LocalGeometryOverlay& overlay, float pitch, float yaw, float roll, History* history) {
+    return ModifyActiveGlobalObject(overlay, history, "Set Prop Rotation", [&](LoadedChunk& lc, RenderObject& obj) {
+        // Calculate new engine matrix and corresponding float matrix
+        int16_t targetEngineMat[3][3];
+        ConvertEulerToRotationMatrix(pitch, yaw, roll, targetEngineMat);
+
+        float targetMat[3][3];
+        RescaleEngineToViewport(targetEngineMat, targetMat);
+
+        // Convert current engine matrix to float
+        float currentMat[3][3];
+        RescaleEngineToViewport(obj.rt, currentMat);
+
+        // Delta rotation = targetMat * transpose(currentMat)
+        float currentTransposed[3][3];
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) {
+                currentTransposed[r][c] = currentMat[c][r];
+            }
+        }
+
+        float deltaRot[3][3];
+        Matrix3x3Multiply(targetMat, currentTransposed, deltaRot);
+
+        // Transform vertices around instance world anchor
+        Vector3 anchor = GetGlobalObjectWorldAnchor(lc, obj);
+        for (auto& mesh : obj.meshes) {
+            for (size_t i = 0; i < mesh.vx.size(); ++i) {
+                Vector3 p = { mesh.vx[i], mesh.vy[i], mesh.vz[i] };
+                Vector3 pNew = TransformPointAroundPivot(p, anchor, deltaRot);
+                mesh.vx[i] = pNew.x;
+                mesh.vy[i] = pNew.y;
+                mesh.vz[i] = pNew.z;
+            }
+        }
+
+        memcpy(obj.rt, targetEngineMat, sizeof(obj.rt));
+        return true;
+    });
+}
+
+bool RotateGlobalObjectExternal(LocalGeometryOverlay& overlay, Vector3 worldAxis, float angleRad, History* history) {
+    return ModifyActiveGlobalObject(overlay, history, "Rotate Prop", [&](LoadedChunk& lc, RenderObject& obj) {
+        float deltaRot[3][3];
+        CreateAxisAngleMatrix(worldAxis, angleRad, deltaRot);
+
+        Vector3 anchor = GetGlobalObjectWorldAnchor(lc, obj);
+        for (auto& mesh : obj.meshes) {
+            for (size_t i = 0; i < mesh.vx.size(); ++i) {
+                Vector3 p = { mesh.vx[i], mesh.vy[i], mesh.vz[i] };
+                Vector3 pNew = TransformPointAroundPivot(p, anchor, deltaRot);
+                mesh.vx[i] = pNew.x;
+                mesh.vy[i] = pNew.y;
+                mesh.vz[i] = pNew.z;
+            }
+        }
+
+        RotateMatrixExternal(obj.rt, worldAxis, angleRad, obj.rt);
+        return true;
+    });
+}
+
+bool RotateGlobalObject(LocalGeometryOverlay& overlay, int yawSteps, History* history) {
+    return RotateGlobalObjectExternal(overlay, { 0.0f, 1.0f, 0.0f }, (float)yawSteps * (PI * 0.5f), history);
+}
+
+bool TranslateGlobalObject(LocalGeometryOverlay& overlay, Vector3 worldDelta, History* history) {
+    return ModifyActiveGlobalObject(overlay, history, "Translate Prop", [&](LoadedChunk&, RenderObject& obj) {
+        int32_t dTx = (int32_t)round(worldDelta.x * 256.0f);
+        int32_t dTy = -(int32_t)round(worldDelta.y * 256.0f);
+        int32_t dTz = -(int32_t)round(worldDelta.z * 256.0f);
+
+        obj.rawTx += dTx;
+        obj.rawTy += dTy;
+        obj.rawTz += dTz;
+
+        for (auto& mesh : obj.meshes) {
+            for (size_t i = 0; i < mesh.vx.size(); ++i) {
+                mesh.vx[i] += worldDelta.x;
+                mesh.vy[i] += worldDelta.y;
+                mesh.vz[i] += worldDelta.z;
+            }
+        }
+        return true;
+    });
 }
 
 bool SnapGlobalObjectToFloor(LocalGeometryOverlay& overlay, History* history) {
-    LoadedChunk* lc = nullptr;
-    RenderObject* obj = nullptr;
-    if (!GetActiveGlobalObject(overlay, lc, obj))
-        return false;
-
-    float minY = 99999.0f;
-    for (const auto& mesh : obj->meshes) {
-        for (float y : mesh.vy) {
-            if (y < minY) minY = y;
+    return ModifyActiveGlobalObject(overlay, history, "Snap Prop to Floor", [&](LoadedChunk& lc, RenderObject& obj) {
+        float minY = 99999.0f;
+        for (const auto& mesh : obj.meshes) {
+            for (float y : mesh.vy) {
+                if (y < minY) minY = y;
+            }
         }
-    }
-    if (minY > 90000.0f) return false;
+        if (minY > 90000.0f) return false;
 
-    float centerX = (obj->bounds.min.x + obj->bounds.max.x) * 0.5f;
-    float centerZ = (obj->bounds.min.z + obj->bounds.max.z) * 0.5f;
-    float targetFloorY = FindFloorHeightBelow(overlay, centerX, centerZ, minY, lc->data->chunkName, overlay.m_selectedObjectIdx);
+        float centerX = (obj.bounds.min.x + obj.bounds.max.x) * 0.5f;
+        float centerZ = (obj.bounds.min.z + obj.bounds.max.z) * 0.5f;
+        float targetFloorY = FindFloorHeightBelow(overlay, centerX, centerZ, minY, lc.data->chunkName, overlay.m_selectedObjectIdx);
 
-    // Test bounding box corners if center missed
-    if (targetFloorY < -90000.0f) {
-        float testPts[4][2] = {
-            {obj->bounds.min.x, obj->bounds.min.z},
-            {obj->bounds.max.x, obj->bounds.min.z},
-            {obj->bounds.min.x, obj->bounds.max.z},
-            {obj->bounds.max.x, obj->bounds.max.z}
-        };
-        for (int p = 0; p < 4; ++p) {
-            float hy = FindFloorHeightBelow(overlay, testPts[p][0], testPts[p][1], minY, lc->data->chunkName, overlay.m_selectedObjectIdx);
-            if (hy > targetFloorY) targetFloorY = hy;
+        if (targetFloorY < -90000.0f) {
+            float testPts[4][2] = {
+                {obj.bounds.min.x, obj.bounds.min.z},
+                {obj.bounds.max.x, obj.bounds.min.z},
+                {obj.bounds.min.x, obj.bounds.max.z},
+                {obj.bounds.max.x, obj.bounds.max.z}
+            };
+            for (int p = 0; p < 4; ++p) {
+                float hy = FindFloorHeightBelow(overlay, testPts[p][0], testPts[p][1], minY, lc.data->chunkName, overlay.m_selectedObjectIdx);
+                if (hy > targetFloorY) targetFloorY = hy;
+            }
         }
-    }
 
-    if (targetFloorY < -90000.0f) {
-        targetFloorY = 0.0f; // fallback to level ground
-    }
-
-    float deltaY = targetFloorY - minY;
-    if (fabsf(deltaY) < 0.0001f) return false;
-
-    MeshSnapshot snap;
-    if (history) {
-        snap.chunkName = lc->data->chunkName;
-        snap.objectIdx = overlay.m_selectedObjectIdx;
-        snap.meshIdx = 0;
-        if (!obj->meshes.empty()) snap.before = obj->meshes[0];
-        snap.description = "Snap Prop " + obj->name + " to Floor";
-    }
-
-    // Offset vertices and rawTy
-    int32_t rawDy = (int32_t)round(deltaY * 256.0f);
-    obj->rawTy -= rawDy;
-
-    for (auto& mesh : obj->meshes) {
-        for (float& y : mesh.vy) {
-            y += deltaY;
+        if (targetFloorY < -90000.0f) {
+            targetFloorY = 0.0f;
         }
-    }
-    obj->bounds.min.y += deltaY;
-    obj->bounds.max.y += deltaY;
 
-    if (history && !obj->meshes.empty()) {
-        snap.after = obj->meshes[0];
-        history->Push(std::move(snap));
-    }
+        float deltaY = targetFloorY - minY;
+        if (fabsf(deltaY) < 0.0001f) return false;
 
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
-    return true;
+        int32_t rawDy = (int32_t)round(deltaY * 256.0f);
+        obj.rawTy -= rawDy;
+
+        for (auto& mesh : obj.meshes) {
+            for (float& y : mesh.vy) {
+                y += deltaY;
+            }
+        }
+        return true;
+    });
 }
 
 bool SnapGlobalObjectToGrid(LocalGeometryOverlay& overlay, History* history) {
-    LoadedChunk* lc = nullptr;
-    RenderObject* obj = nullptr;
-    if (!GetActiveGlobalObject(overlay, lc, obj))
-        return false;
+    return ModifyActiveGlobalObject(overlay, history, "Snap Prop to Grid", [&](LoadedChunk&, RenderObject& obj) {
+        int rawStep = 1 << overlay.m_moveStepPower;
+        int32_t newRawTx = (int32_t)round((double)obj.rawTx / (double)rawStep) * rawStep;
+        int32_t newRawTz = (int32_t)round((double)obj.rawTz / (double)rawStep) * rawStep;
 
-    int rawStep = 1 << overlay.m_moveStepPower;
-    int32_t newRawTx = (int32_t)round((double)obj->rawTx / (double)rawStep) * rawStep;
-    int32_t newRawTz = (int32_t)round((double)obj->rawTz / (double)rawStep) * rawStep;
+        int32_t dTx = newRawTx - obj.rawTx;
+        int32_t dTz = newRawTz - obj.rawTz;
+        if (dTx == 0 && dTz == 0) return false;
 
-    int32_t dTx = newRawTx - obj->rawTx;
-    int32_t dTz = newRawTz - obj->rawTz;
-    if (dTx == 0 && dTz == 0) return false;
+        float dx = (float)dTx * (1.0f / 256.0f);
+        float dz = -(float)dTz * (1.0f / 256.0f);
 
-    float dx = (float)dTx * (1.0f / 256.0f);
-    float dz = -(float)dTz * (1.0f / 256.0f);
+        obj.rawTx = newRawTx;
+        obj.rawTz = newRawTz;
 
-    MeshSnapshot snap;
-    if (history) {
-        snap.chunkName = lc->data->chunkName;
-        snap.objectIdx = overlay.m_selectedObjectIdx;
-        snap.meshIdx = 0;
-        if (!obj->meshes.empty()) snap.before = obj->meshes[0];
-        snap.description = "Snap Prop " + obj->name + " to Grid";
-    }
-
-    obj->rawTx = newRawTx;
-    obj->rawTz = newRawTz;
-
-    for (auto& mesh : obj->meshes) {
-        for (size_t i = 0; i < mesh.vx.size(); ++i) {
-            mesh.vx[i] += dx;
-            mesh.vz[i] += dz;
+        for (auto& mesh : obj.meshes) {
+            for (size_t i = 0; i < mesh.vx.size(); ++i) {
+                mesh.vx[i] += dx;
+                mesh.vz[i] += dz;
+            }
         }
-    }
-    obj->bounds.min.x += dx; obj->bounds.max.x += dx;
-    obj->bounds.min.z += dz; obj->bounds.max.z += dz;
-
-    if (history && !obj->meshes.empty()) {
-        snap.after = obj->meshes[0];
-        history->Push(std::move(snap));
-    }
-
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
-    return true;
+        return true;
+    });
 }
 
 bool DuplicateGlobalObject(LocalGeometryOverlay& overlay, History* history) {
@@ -283,7 +335,7 @@ bool DuplicateGlobalObject(LocalGeometryOverlay& overlay, History* history) {
         return false;
 
     RenderObject newObj = *obj;
-    newObj.ipdDataOffset = -1; // Must be -1 to allocate a new IPD_OBJ_DATA entry on write
+    newObj.ipdDataOffset = -1; // Allocates a new IPD_OBJ_DATA entry on write
     newObj.ipdObjId = obj->ipdObjId;
     newObj.ipdPosGroup = obj->ipdPosGroup;
 
@@ -294,8 +346,7 @@ bool DuplicateGlobalObject(LocalGeometryOverlay& overlay, History* history) {
             x += 1.0f;
         }
     }
-    newObj.bounds.min.x += 1.0f;
-    newObj.bounds.max.x += 1.0f;
+    RecalculateObjectBounds(newObj);
 
     lc->data->objects.push_back(std::move(newObj));
     overlay.m_selectedObjectIdx = (int)lc->data->objects.size() - 1;
@@ -312,8 +363,7 @@ bool DuplicateGlobalObject(LocalGeometryOverlay& overlay, History* history) {
         history->Push(std::move(snap));
     }
 
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
+    overlay.RebuildChunkBatches(lc->data->chunkName, GetWorkspaceDir(overlay));
     return true;
 }
 
@@ -336,70 +386,41 @@ bool DeleteGlobalObject(LocalGeometryOverlay& overlay, History* history) {
     lc->data->objects.erase(lc->data->objects.begin() + overlay.m_selectedObjectIdx);
     overlay.m_selectedObjectIdx = -1;
 
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
+    overlay.RebuildChunkBatches(lc->data->chunkName, GetWorkspaceDir(overlay));
     return true;
 }
 
 bool MirrorGlobalObject(LocalGeometryOverlay& overlay, int axis, History* history) {
-    LoadedChunk* lc = nullptr;
-    RenderObject* obj = nullptr;
-    if (!GetActiveGlobalObject(overlay, lc, obj))
-        return false;
+    return ModifyActiveGlobalObject(overlay, history, "Mirror Prop", [&](LoadedChunk&, RenderObject& obj) {
+        Vector3 center = {
+            (obj.bounds.min.x + obj.bounds.max.x) * 0.5f,
+            (obj.bounds.min.y + obj.bounds.max.y) * 0.5f,
+            (obj.bounds.min.z + obj.bounds.max.z) * 0.5f
+        };
 
-    Vector3 center = {
-        (obj->bounds.min.x + obj->bounds.max.x) * 0.5f,
-        (obj->bounds.min.y + obj->bounds.max.y) * 0.5f,
-        (obj->bounds.min.z + obj->bounds.max.z) * 0.5f
-    };
+        for (auto& mesh : obj.meshes) {
+            for (size_t i = 0; i < mesh.vx.size(); ++i) {
+                if (axis == 0) mesh.vx[i] = 2.0f * center.x - mesh.vx[i];
+                else if (axis == 1) mesh.vy[i] = 2.0f * center.y - mesh.vy[i];
+                else if (axis == 2) mesh.vz[i] = 2.0f * center.z - mesh.vz[i];
+            }
 
-    MeshSnapshot snap;
-    if (history) {
-        snap.chunkName = lc->data->chunkName;
-        snap.objectIdx = overlay.m_selectedObjectIdx;
-        snap.meshIdx = 0;
-        if (!obj->meshes.empty()) snap.before = obj->meshes[0];
-        snap.description = "Mirror Prop " + obj->name;
-    }
-
-    obj->bounds = {{99999.0f, 99999.0f, 99999.0f}, {-99999.0f, -99999.0f, -99999.0f}};
-    for (auto& mesh : obj->meshes) {
-        for (size_t i = 0; i < mesh.vx.size(); ++i) {
-            if (axis == 0) mesh.vx[i] = 2.0f * center.x - mesh.vx[i];
-            else if (axis == 1) mesh.vy[i] = 2.0f * center.y - mesh.vy[i];
-            else if (axis == 2) mesh.vz[i] = 2.0f * center.z - mesh.vz[i];
-
-            obj->bounds.min.x = std::min(obj->bounds.min.x, mesh.vx[i]);
-            obj->bounds.min.y = std::min(obj->bounds.min.y, mesh.vy[i]);
-            obj->bounds.min.z = std::min(obj->bounds.min.z, mesh.vz[i]);
-            obj->bounds.max.x = std::max(obj->bounds.max.x, mesh.vx[i]);
-            obj->bounds.max.y = std::max(obj->bounds.max.y, mesh.vy[i]);
-            obj->bounds.max.z = std::max(obj->bounds.max.z, mesh.vz[i]);
-        }
-
-        // Invert face winding
-        for (auto& face : mesh.faces) {
-            bool isQuad = (face.v[3] != 0xFF);
-            if (isQuad) {
-                std::swap(face.v[1], face.v[3]);
-                std::swap(face.uv[1][0], face.uv[3][0]);
-                std::swap(face.uv[1][1], face.uv[3][1]);
-            } else {
-                std::swap(face.v[0], face.v[2]);
-                std::swap(face.uv[0][0], face.uv[2][0]);
-                std::swap(face.uv[0][1], face.uv[2][1]);
+            // Invert face winding
+            for (auto& face : mesh.faces) {
+                bool isQuad = (face.v[3] != 0xFF);
+                if (isQuad) {
+                    std::swap(face.v[1], face.v[3]);
+                    std::swap(face.uv[1][0], face.uv[3][0]);
+                    std::swap(face.uv[1][1], face.uv[3][1]);
+                } else {
+                    std::swap(face.v[0], face.v[2]);
+                    std::swap(face.uv[0][0], face.uv[2][0]);
+                    std::swap(face.uv[0][1], face.uv[2][1]);
+                }
             }
         }
-    }
-
-    if (history && !obj->meshes.empty()) {
-        snap.after = obj->meshes[0];
-        history->Push(std::move(snap));
-    }
-
-    std::string ws = GetWorkspaceDir(overlay);
-    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
-    return true;
+        return true;
+    });
 }
 
 bool MoveGlobalObjectToChunk(LocalGeometryOverlay& overlay, const std::string& targetChunkName, History* history) {

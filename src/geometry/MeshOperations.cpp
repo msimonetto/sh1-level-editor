@@ -217,6 +217,13 @@ bool TranslateSelection(
                         snap.objectIdx = selectedObjectIdx;
                         snap.meshIdx = (int)mi;
                         snap.before = mesh;
+                        if (obj.isGlobal) {
+                            snap.hasObjectTransform = true;
+                            snap.rawTxBefore = obj.rawTx;
+                            snap.rawTyBefore = obj.rawTy;
+                            snap.rawTzBefore = obj.rawTz;
+                            memcpy(snap.rtBefore, obj.rt, sizeof(obj.rt));
+                        }
                         snap.description = "Translate Object";
                     }
 
@@ -236,6 +243,12 @@ bool TranslateSelection(
 
                     if (history) {
                         snap.after = mesh;
+                        if (obj.isGlobal) {
+                            snap.rawTxAfter = obj.rawTx + (int32_t)std::round(delta.x * 256.0f);
+                            snap.rawTyAfter = obj.rawTy - (int32_t)std::round(delta.y * 256.0f);
+                            snap.rawTzAfter = obj.rawTz - (int32_t)std::round(delta.z * 256.0f);
+                            memcpy(snap.rtAfter, obj.rt, sizeof(obj.rt));
+                        }
                         history->Push(std::move(snap));
                     }
                 }
