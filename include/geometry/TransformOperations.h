@@ -17,6 +17,7 @@ float   ByteToNormalizedUv(uint8_t raw);
 void    ComputeUvBounds(const float uv[4][2], int numVerts, float& minU, float& maxU, float& minV, float& maxV);
 void    InvertPolygonWinding(uint8_t v[4], float uv[4][2], uint8_t rawU[4], uint8_t rawV[4]);
 void    RotatePolygonUv(float uv[4][2], uint8_t rawU[4], uint8_t rawV[4], int numVerts, int steps);
+void    ResetFaceDefaultUV(float uv[4][2], uint8_t rawU[4], uint8_t rawV[4], int numVerts);
 
 // Matrix algebra utilities
 void Matrix3x3Multiply(const float a[3][3], const float b[3][3], float out[3][3]);

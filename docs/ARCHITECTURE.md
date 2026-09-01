@@ -382,6 +382,7 @@ Centralized 3D matrix algebra, rotation conversions, vector math, and UV quantiz
 - `ComputeUvBounds()`: Bounding box extents for UV coordinates.
 - `InvertPolygonWinding()`: Vertex and UV winding order inversion for triangles and quads.
 - `RotatePolygonUv()`: Cyclic UV shift on polygon vertices.
+- `ResetFaceDefaultUV()`: Standardizes reset of triangle and quad UV coordinates and raw quantized bytes to default unit quad/triangle boundaries.
 - `Matrix3x3Multiply()`, `CreateAxisAngleMatrix()`, `TransformPointAroundPivot()`.
 - `RescaleEngineToViewport()`, `RescaleViewportToEngine()`, `ConvertRotationMatrixToEuler()`, `ConvertEulerToRotationMatrix()`, `RotateMatrixExternal()`.
 
@@ -390,6 +391,15 @@ Shared utility functions across geometry manipulation routines:
 - `GetWorkspaceDir()`: Resolves active workspace directory with overlay and project fallbacks.
 - `FindFloorHeightBelow()`: Downward raycasting across all chunk models to detect walkable ground.
 - `RecalculateObjectBounds()`: Recalculates object-level 3D AABB bounds across all meshes.
+- `GetEffectiveSelectedVertices()`, `GetEffectiveSelectedFaces()`: Resolves effective multi-selection vs single active selection.
+- `GetActiveMeshTarget()`: Resolves active chunk, object, and mesh pointers from current overlay selection.
+- `GetMeshVertex()`, `AddMeshVertex()`, `ComputeVertexCentroid()`: Direct coordinate vector conversion and array insertion.
+- `ComputeFaceNormal()`: Calculates 3D surface normal vector for a render face.
+- `SortVerticesByAngle()`: Orders polygon vertices circularly around their normal in local 2D projection space to prevent non-convex / self-intersecting quads.
+- `CreateDefaultFace()`: Instantiates default or inherited triangle/quad render faces with canonical UV mappings.
+- `CompactMeshUnusedVertices()`: Removes unreferenced vertices from mesh vertex buffers and remaps face indices.
+- `ForEachSelectedMeshVertices()`: Generic iteration template across meshes in the active vertex selection, automating snapshotting, bounds recalculation, and GPU batch rebuilds.
+- `ForEachSelectedMeshFaces()`: Generic iteration template across meshes in the active face selection, automating snapshotting, bounds recalculation, and GPU batch rebuilds.
 
 ### `SubdivideFace.h`
 - `SubdivideSelectedFaces()`: Subdivides selected polygon faces into grid-aligned tiles while enforcing the 255-vertex budget.

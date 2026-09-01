@@ -18,59 +18,16 @@
 
 namespace Geometry {
 
-static std::set<SelectedVertex> GetEffectiveSelectedVertices(const LocalGeometryOverlay& overlay) {
-    std::set<SelectedVertex> result = overlay.m_selectedVertices;
-    if (result.empty() && overlay.m_selectedVertexIdx >= 0 && !overlay.m_selectedChunk.empty() && overlay.m_selectedObjectIdx >= 0) {
-        result.insert({overlay.m_selectedChunk, overlay.m_selectedObjectIdx, overlay.m_selectedMeshIdx >= 0 ? overlay.m_selectedMeshIdx : 0, overlay.m_selectedVertexIdx});
-    }
-    return result;
-}
-
 // ---------------------------------------------------------------------------
 // SnapVerticesToGrid
 // ---------------------------------------------------------------------------
 bool SnapVerticesToGrid(LocalGeometryOverlay& overlay, History* history) {
-    auto selVerts = GetEffectiveSelectedVertices(overlay);
-    if (selVerts.empty()) return false;
-
     int rawUnits = 1 << overlay.m_moveStepPower;
     float step = (float)rawUnits / 256.0f;
     if (step <= 0.0001f) step = 1.0f / 256.0f;
 
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sv : selVerts) {
-        modifiedMeshes.insert({sv.chunkName, sv.objectIdx, sv.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> vertIndices;
-            for (const auto& sv : selVerts) {
-                if (sv.chunkName == cName && sv.objectIdx == oIdx && sv.meshIdx == mIdx)
-                    vertIndices.insert(sv.vertexIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Snap Vertices to Grid";
-            }
-
+    return ForEachSelectedMeshVertices(overlay, history, "Snap Vertices to Grid",
+        [step](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& vertIndices) {
             bool changed = false;
             for (int vIdx : vertIndices) {
                 if (vIdx < 0 || vIdx >= (int)mesh.vx.size()) continue;
@@ -79,126 +36,34 @@ bool SnapVerticesToGrid(LocalGeometryOverlay& overlay, History* history) {
                 mesh.vz[vIdx] = std::round(mesh.vz[vIdx] / step) * step;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                RecalculateBounds(overlay);
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // SnapVerticesToFloor
 // ---------------------------------------------------------------------------
 bool SnapVerticesToFloor(LocalGeometryOverlay& overlay, History* history) {
-    auto selVerts = GetEffectiveSelectedVertices(overlay);
-    if (selVerts.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sv : selVerts) {
-        modifiedMeshes.insert({sv.chunkName, sv.objectIdx, sv.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> vertIndices;
-            for (const auto& sv : selVerts) {
-                if (sv.chunkName == cName && sv.objectIdx == oIdx && sv.meshIdx == mIdx)
-                    vertIndices.insert(sv.vertexIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Snap Vertices to Floor";
-            }
-
+    return ForEachSelectedMeshVertices(overlay, history, "Snap Vertices to Floor",
+        [&overlay](LoadedChunk& lc, RenderObject&, RenderMesh& mesh, const std::vector<int>& vertIndices) {
             bool changed = false;
             for (int vIdx : vertIndices) {
                 if (vIdx < 0 || vIdx >= (int)mesh.vx.size()) continue;
-                float flrY = FindFloorHeightBelow(overlay, mesh.vx[vIdx], mesh.vz[vIdx], mesh.vy[vIdx], cName, oIdx);
-                if (flrY > -90000.0f) {
-                    mesh.vy[vIdx] = flrY;
-                } else {
-                    mesh.vy[vIdx] = 0.0f;
-                }
+                float flrY = FindFloorHeightBelow(overlay, mesh.vx[vIdx], mesh.vz[vIdx], mesh.vy[vIdx], lc.data->chunkName, -1);
+                mesh.vy[vIdx] = (flrY > -90000.0f) ? flrY : 0.0f;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                RecalculateBounds(overlay);
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // PlanarizeVertices
 // ---------------------------------------------------------------------------
 bool PlanarizeVertices(LocalGeometryOverlay& overlay, int axis, History* history) {
-    auto selVerts = GetEffectiveSelectedVertices(overlay);
-    if (selVerts.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sv : selVerts) {
-        modifiedMeshes.insert({sv.chunkName, sv.objectIdx, sv.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> vertIndices;
-            for (const auto& sv : selVerts) {
-                if (sv.chunkName == cName && sv.objectIdx == oIdx && sv.meshIdx == mIdx)
-                    vertIndices.insert(sv.vertexIdx);
-            }
-
-            if (vertIndices.empty()) continue;
-
+    const char* desc = (axis == 0) ? "Flatten X" : (axis == 1 ? "Flatten Y" : "Flatten Z");
+    return ForEachSelectedMeshVertices(overlay, history, desc,
+        [axis](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& vertIndices) {
             double sum = 0.0;
             int count = 0;
             for (int vIdx : vertIndices) {
@@ -209,17 +74,8 @@ bool PlanarizeVertices(LocalGeometryOverlay& overlay, int axis, History* history
                 count++;
             }
 
-            if (count == 0) continue;
+            if (count == 0) return false;
             float avg = (float)(sum / count);
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = (axis == 0) ? "Flatten X" : (axis == 1 ? "Flatten Y" : "Flatten Z");
-            }
 
             for (int vIdx : vertIndices) {
                 if (vIdx < 0 || vIdx >= (int)mesh.vx.size()) continue;
@@ -227,19 +83,8 @@ bool PlanarizeVertices(LocalGeometryOverlay& overlay, int axis, History* history
                 else if (axis == 1) mesh.vy[vIdx] = avg;
                 else if (axis == 2) mesh.vz[vIdx] = avg;
             }
-
-            if (history) {
-                snap.after = mesh;
-                history->Push(std::move(snap));
-            }
-
-            RecalculateBounds(overlay);
-            std::string ws = GetWorkspaceDir(overlay);
-            overlay.RebuildChunkBatches(cName, ws);
-            anyModified = true;
-        }
-    }
-    return anyModified;
+            return true;
+        });
 }
 
 // ---------------------------------------------------------------------------
@@ -252,125 +97,45 @@ bool AddFaceFromSelectedVertices(LocalGeometryOverlay& overlay, History* history
         return false;
     }
 
-    std::string cName;
-    int oIdx = -1, mIdx = -1;
-    std::vector<int> vertIndices;
+    LoadedChunk* lc = nullptr;
+    RenderObject* obj = nullptr;
+    RenderMesh* mesh = nullptr;
+    if (!GetActiveMeshTarget(overlay, lc, obj, mesh) || !lc || !obj || !mesh) return false;
 
+    int mIdx = overlay.m_selectedMeshIdx >= 0 ? overlay.m_selectedMeshIdx : 0;
+    std::vector<int> vertIndices;
     for (const auto& sv : selVerts) {
-        if (cName.empty()) {
-            cName = sv.chunkName; oIdx = sv.objectIdx; mIdx = sv.meshIdx;
-        }
-        if (sv.chunkName == cName && sv.objectIdx == oIdx && sv.meshIdx == mIdx) {
+        if (sv.chunkName == lc->data->chunkName && sv.objectIdx == overlay.m_selectedObjectIdx && sv.meshIdx == mIdx) {
             vertIndices.push_back(sv.vertexIdx);
         }
     }
-
     if (vertIndices.size() != 3 && vertIndices.size() != 4) return false;
 
-    for (const auto& lcConst : overlay.GetChunks()) {
-        auto& lc = const_cast<LoadedChunk&>(lcConst);
-        if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-        auto& obj = lc.data->objects[oIdx];
-        if (mIdx >= (int)obj.meshes.size()) break;
-        auto& mesh = obj.meshes[mIdx];
-
-        MeshSnapshot snap;
-        if (history) {
-            snap.chunkName = cName;
-            snap.objectIdx = oIdx;
-            snap.meshIdx = mIdx;
-            snap.before = mesh;
-            snap.description = "Add Face from Vertices";
-        }
-
-        RenderFace newFace;
-        memset(&newFace, 0, sizeof(newFace));
-        newFace.addr.plmObjectName = obj.name;
-        newFace.addr.meshIdx = mIdx;
-        newFace.addr.isGlobal = obj.isGlobal;
-
-        // Inherit default texture properties from first existing face if available
-        if (!mesh.faces.empty()) {
-            newFace.texName = mesh.faces[0].texName;
-            newFace.texNum = mesh.faces[0].texNum;
-            newFace.paletteRow = mesh.faces[0].paletteRow;
-            newFace.cbaRaw = mesh.faces[0].cbaRaw;
-        } else {
-            newFace.texNum = 0x7F;
-        }
-
-        if (vertIndices.size() == 3) {
-            newFace.v[0] = (uint8_t)vertIndices[0];
-            newFace.v[1] = (uint8_t)vertIndices[1];
-            newFace.v[2] = (uint8_t)vertIndices[2];
-            newFace.v[3] = 0xFF;
-
-            newFace.uv[0][0] = 0.0f; newFace.uv[0][1] = 0.0f;
-            newFace.uv[1][0] = 1.0f; newFace.uv[1][1] = 0.0f;
-            newFace.uv[2][0] = 1.0f; newFace.uv[2][1] = 1.0f;
-
-            newFace.rawU[0] = 0;   newFace.rawU[1] = 255; newFace.rawU[2] = 255;
-            newFace.rawV[0] = 0;   newFace.rawV[1] = 0;   newFace.rawV[2] = 255;
-        } else {
-            // Sort 4 vertices around their centroid in the best-fit plane to prevent self-intersection
-            Vector3 center = { 0, 0, 0 };
-            for (int vi : vertIndices) {
-                center.x += mesh.vx[vi]; center.y += mesh.vy[vi]; center.z += mesh.vz[vi];
-            }
-            center.x /= 4.0f; center.y /= 4.0f; center.z /= 4.0f;
-
-            Vector3 v0 = { mesh.vx[vertIndices[0]], mesh.vy[vertIndices[0]], mesh.vz[vertIndices[0]] };
-            Vector3 v1 = { mesh.vx[vertIndices[1]], mesh.vy[vertIndices[1]], mesh.vz[vertIndices[1]] };
-            Vector3 v2 = { mesh.vx[vertIndices[2]], mesh.vy[vertIndices[2]], mesh.vz[vertIndices[2]] };
-            Vector3 norm = ComputeTriangleNormal(v0, v1, v2);
-
-            Vector3 axisU = Vector3Normalize(Vector3Subtract(v0, center));
-            if (Vector3Length(axisU) < 0.001f) axisU = { 1.0f, 0.0f, 0.0f };
-            Vector3 axisV = Vector3CrossProduct(norm, axisU);
-
-            struct AngleSort {
-                int vIdx;
-                float angle;
-            };
-            std::vector<AngleSort> sorted;
-            for (int vi : vertIndices) {
-                Vector3 toV = { mesh.vx[vi] - center.x, mesh.vy[vi] - center.y, mesh.vz[vi] - center.z };
-                float u = Vector3DotProduct(toV, axisU);
-                float v = Vector3DotProduct(toV, axisV);
-                float ang = std::atan2(v, u);
-                sorted.push_back({ vi, ang });
-            }
-            std::sort(sorted.begin(), sorted.end(), [](const AngleSort& a, const AngleSort& b) {
-                return a.angle < b.angle;
-            });
-
-            newFace.v[0] = (uint8_t)sorted[0].vIdx;
-            newFace.v[1] = (uint8_t)sorted[1].vIdx;
-            newFace.v[2] = (uint8_t)sorted[2].vIdx;
-            newFace.v[3] = (uint8_t)sorted[3].vIdx;
-
-            newFace.uv[0][0] = 0.0f; newFace.uv[0][1] = 0.0f;
-            newFace.uv[1][0] = 1.0f; newFace.uv[1][1] = 0.0f;
-            newFace.uv[2][0] = 1.0f; newFace.uv[2][1] = 1.0f;
-            newFace.uv[3][0] = 0.0f; newFace.uv[3][1] = 1.0f;
-
-            newFace.rawU[0] = 0;   newFace.rawU[1] = 255; newFace.rawU[2] = 255; newFace.rawU[3] = 0;
-            newFace.rawV[0] = 0;   newFace.rawV[1] = 0;   newFace.rawV[2] = 255; newFace.rawV[3] = 255;
-        }
-
-        mesh.faces.push_back(newFace);
-
-        if (history) {
-            snap.after = mesh;
-            history->Push(std::move(snap));
-        }
-
-        RecalculateBounds(overlay);
-        std::string ws = GetWorkspaceDir(overlay);
-        overlay.RebuildChunkBatches(cName, ws);
-        return true;
+    MeshSnapshot snap;
+    if (history) {
+        snap.chunkName = lc->data->chunkName;
+        snap.objectIdx = overlay.m_selectedObjectIdx;
+        snap.meshIdx = mIdx;
+        snap.before = *mesh;
+        snap.description = "Add Face from Vertices";
     }
-    return false;
+
+    std::vector<uint8_t> sorted = (vertIndices.size() == 4) ? SortVerticesByAngle(*mesh, vertIndices)
+                                                             : std::vector<uint8_t>(vertIndices.begin(), vertIndices.end());
+
+    const RenderFace* inheritFace = mesh->faces.empty() ? nullptr : &mesh->faces[0];
+    RenderFace newFace = CreateDefaultFace(*obj, mIdx, sorted, inheritFace);
+    mesh->faces.push_back(newFace);
+
+    if (history) {
+        snap.after = *mesh;
+        history->Push(std::move(snap));
+    }
+
+    RecalculateBounds(overlay);
+    std::string ws = GetWorkspaceDir(overlay);
+    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -456,56 +221,33 @@ bool ExtrudeSelectedVertices(LocalGeometryOverlay& overlay, Vector3 offset, Hist
                 // Extrude face along normal, creating 5 faces (4 outward side quads + 1 cap quad),
                 // remove original face, and select the new cap face vertices.
                 const RenderFace origFace = mesh.faces[foundFaceIdx];
-                uint8_t v0 = origFace.v[0];
-                uint8_t v1 = origFace.v[1];
-                uint8_t v2 = origFace.v[2];
-                uint8_t v3 = origFace.v[3];
-                uint8_t origV[4] = { v0, v1, v2, v3 };
+                uint8_t origV[4] = { origFace.v[0], origFace.v[1], origFace.v[2], origFace.v[3] };
 
-                Vector3 p0 = { mesh.vx[v0], mesh.vy[v0], mesh.vz[v0] };
-                Vector3 p1 = { mesh.vx[v1], mesh.vy[v1], mesh.vz[v1] };
-                Vector3 p2 = { mesh.vx[v2], mesh.vy[v2], mesh.vz[v2] };
-                Vector3 p3 = { mesh.vx[v3], mesh.vy[v3], mesh.vz[v3] };
+                Vector3 p0 = GetMeshVertex(mesh, origV[0]);
+                Vector3 p1 = GetMeshVertex(mesh, origV[1]);
+                Vector3 p2 = GetMeshVertex(mesh, origV[2]);
+                Vector3 p3 = GetMeshVertex(mesh, origV[3]);
 
                 Vector3 norm = ComputeTriangleNormal(p0, p1, p2);
                 Vector3 finalOffset = Vector3Scale(norm, step);
 
-                uint8_t nv0 = (uint8_t)mesh.vx.size();
-                mesh.vx.push_back(p0.x + finalOffset.x);
-                mesh.vy.push_back(p0.y + finalOffset.y);
-                mesh.vz.push_back(p0.z + finalOffset.z);
-
-                uint8_t nv1 = (uint8_t)mesh.vx.size();
-                mesh.vx.push_back(p1.x + finalOffset.x);
-                mesh.vy.push_back(p1.y + finalOffset.y);
-                mesh.vz.push_back(p1.z + finalOffset.z);
-
-                uint8_t nv2 = (uint8_t)mesh.vx.size();
-                mesh.vx.push_back(p2.x + finalOffset.x);
-                mesh.vy.push_back(p2.y + finalOffset.y);
-                mesh.vz.push_back(p2.z + finalOffset.z);
-
-                uint8_t nv3 = (uint8_t)mesh.vx.size();
-                mesh.vx.push_back(p3.x + finalOffset.x);
-                mesh.vy.push_back(p3.y + finalOffset.y);
-                mesh.vz.push_back(p3.z + finalOffset.z);
-
-                uint8_t newV[4] = { nv0, nv1, nv2, nv3 };
+                uint8_t newV[4] = {
+                    AddMeshVertex(mesh, Vector3Add(p0, finalOffset)),
+                    AddMeshVertex(mesh, Vector3Add(p1, finalOffset)),
+                    AddMeshVertex(mesh, Vector3Add(p2, finalOffset)),
+                    AddMeshVertex(mesh, Vector3Add(p3, finalOffset))
+                };
 
                 bool hasTexture = (origFace.texNum != 0x7F && !origFace.texName.empty());
                 float minU = 0.0f, maxU = 1.0f, minV = 0.0f, maxV = 1.0f;
                 uint8_t minRawU = 0, maxRawU = 255, minRawV = 0, maxRawV = 255;
 
                 if (hasTexture) {
-                    minU = std::min({origFace.uv[0][0], origFace.uv[1][0], origFace.uv[2][0], origFace.uv[3][0]});
-                    maxU = std::max({origFace.uv[0][0], origFace.uv[1][0], origFace.uv[2][0], origFace.uv[3][0]});
-                    minV = std::min({origFace.uv[0][1], origFace.uv[1][1], origFace.uv[2][1], origFace.uv[3][1]});
-                    maxV = std::max({origFace.uv[0][1], origFace.uv[1][1], origFace.uv[2][1], origFace.uv[3][1]});
-
-                    minRawU = std::min({origFace.rawU[0], origFace.rawU[1], origFace.rawU[2], origFace.rawU[3]});
-                    maxRawU = std::max({origFace.rawU[0], origFace.rawU[1], origFace.rawU[2], origFace.rawU[3]});
-                    minRawV = std::min({origFace.rawV[0], origFace.rawV[1], origFace.rawV[2], origFace.rawV[3]});
-                    maxRawV = std::max({origFace.rawV[0], origFace.rawV[1], origFace.rawV[2], origFace.rawV[3]});
+                    ComputeUvBounds(origFace.uv, 4, minU, maxU, minV, maxV);
+                    minRawU = NormalizedToByteUv(minU);
+                    maxRawU = NormalizedToByteUv(maxU);
+                    minRawV = NormalizedToByteUv(minV);
+                    maxRawV = NormalizedToByteUv(maxV);
                 }
 
                 std::vector<RenderFace> newFaces;
@@ -542,10 +284,10 @@ bool ExtrudeSelectedVertices(LocalGeometryOverlay& overlay, Vector3 offset, Hist
 
                 // 1 cap face across from the original face, preserving rotation/mirroring
                 RenderFace capFace = origFace;
-                capFace.v[0] = nv0;
-                capFace.v[1] = nv1;
-                capFace.v[2] = nv2;
-                capFace.v[3] = nv3;
+                capFace.v[0] = newV[0];
+                capFace.v[1] = newV[1];
+                capFace.v[2] = newV[2];
+                capFace.v[3] = newV[3];
                 newFaces.push_back(capFace);
 
                 // Remove the original face
@@ -556,32 +298,14 @@ bool ExtrudeSelectedVertices(LocalGeometryOverlay& overlay, Vector3 offset, Hist
                     mesh.faces.push_back(nf);
                 }
 
-                newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, nv0 });
-                newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, nv1 });
-                newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, nv2 });
-                newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, nv3 });
-                if (newPrimarySelectedVertex < 0) newPrimarySelectedVertex = nv0;
-                lastChunkName = cName; lastObjIdx = oIdx; lastMeshIdx = mIdx;
-            } else if (vertIndices.size() == 4) {
-                // 2. 4 vertices do NOT contain a face:
-                // Only duplicate the vertices, do not create any faces.
-                for (int vi : vertIndices) {
-                    uint8_t newIdx = (uint8_t)mesh.vx.size();
-                    mesh.vx.push_back(mesh.vx[vi] + offset.x);
-                    mesh.vy.push_back(mesh.vy[vi] + offset.y);
-                    mesh.vz.push_back(mesh.vz[vi] + offset.z);
-                    newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, newIdx });
-                    if (newPrimarySelectedVertex < 0) newPrimarySelectedVertex = newIdx;
-                }
+                for (int i = 0; i < 4; ++i) newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, newV[i] });
+                if (newPrimarySelectedVertex < 0) newPrimarySelectedVertex = newV[0];
                 lastChunkName = cName; lastObjIdx = oIdx; lastMeshIdx = mIdx;
             } else {
-                // 3. Other count of vertices (e.g. 2 vertices for edge extrusion):
+                // Duplicate vertices along offset vector
                 std::map<uint8_t, uint8_t> oldToNew;
                 for (int vi : vertIndices) {
-                    uint8_t newIdx = (uint8_t)mesh.vx.size();
-                    mesh.vx.push_back(mesh.vx[vi] + offset.x);
-                    mesh.vy.push_back(mesh.vy[vi] + offset.y);
-                    mesh.vz.push_back(mesh.vz[vi] + offset.z);
+                    uint8_t newIdx = AddMeshVertex(mesh, Vector3Add(GetMeshVertex(mesh, vi), offset));
                     oldToNew[(uint8_t)vi] = newIdx;
                     newGlobalSelectedVerts.insert({ cName, oIdx, mIdx, newIdx });
                     if (newPrimarySelectedVertex < 0) newPrimarySelectedVertex = newIdx;
@@ -597,7 +321,7 @@ bool ExtrudeSelectedVertices(LocalGeometryOverlay& overlay, Vector3 offset, Hist
                         for (int i = 0; i < numV; ++i) {
                             uint8_t a = f.v[i];
                             uint8_t b = f.v[(i + 1) % numV];
-                            if (oldToNew.find(a) != oldToNew.end() && oldToNew.find(b) != oldToNew.end()) {
+                            if (oldToNew.count(a) && oldToNew.count(b)) {
                                 uint8_t minV = std::min(a, b);
                                 uint8_t maxV = std::max(a, b);
                                 if (existingEdges.find({minV, maxV}) == existingEdges.end()) {
@@ -660,30 +384,10 @@ bool ExtrudeSelectedVertices(LocalGeometryOverlay& overlay, Vector3 offset, Hist
 bool WeldVertices(LocalGeometryOverlay& overlay, float tolerance, History* history) {
     if (tolerance <= 0.0001f) tolerance = 0.05f;
 
-    auto selVerts = GetEffectiveSelectedVertices(overlay);
-
     LoadedChunk* targetLc = nullptr;
     RenderObject* targetObj = nullptr;
     RenderMesh* targetMesh = nullptr;
-
-    if (!overlay.m_selectedChunk.empty() && overlay.m_selectedObjectIdx >= 0) {
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName == overlay.m_selectedChunk) {
-                if (overlay.m_selectedObjectIdx < (int)lc.data->objects.size()) {
-                    targetLc = &lc;
-                    targetObj = &lc.data->objects[overlay.m_selectedObjectIdx];
-                    int mIdx = overlay.m_selectedMeshIdx >= 0 ? overlay.m_selectedMeshIdx : 0;
-                    if (mIdx < (int)targetObj->meshes.size()) {
-                        targetMesh = &targetObj->meshes[mIdx];
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    if (!targetMesh || !targetLc) return false;
+    if (!GetActiveMeshTarget(overlay, targetLc, targetObj, targetMesh) || !targetMesh || !targetLc) return false;
 
     MeshSnapshot snap;
     if (history) {
@@ -703,10 +407,10 @@ bool WeldVertices(LocalGeometryOverlay& overlay, float tolerance, History* histo
     // Cluster coincident vertices within tolerance
     for (size_t i = 0; i < numV; ++i) {
         if (remap[i] != (int)i) continue;
-        Vector3 vi = { targetMesh->vx[i], targetMesh->vy[i], targetMesh->vz[i] };
+        Vector3 vi = GetMeshVertex(*targetMesh, i);
         for (size_t j = i + 1; j < numV; ++j) {
             if (remap[j] != (int)j) continue;
-            Vector3 vj = { targetMesh->vx[j], targetMesh->vy[j], targetMesh->vz[j] };
+            Vector3 vj = GetMeshVertex(*targetMesh, j);
             if (Vector3Distance(vi, vj) <= tolerance) {
                 remap[j] = (int)i;
                 weldedAny = true;
@@ -753,37 +457,7 @@ bool WeldVertices(LocalGeometryOverlay& overlay, float tolerance, History* histo
         }
     }
     targetMesh->faces = std::move(newFaces);
-
-    // Compact unused vertices
-    std::vector<bool> vertUsed(numV, false);
-    for (const auto& f : targetMesh->faces) {
-        vertUsed[f.v[0]] = true;
-        vertUsed[f.v[1]] = true;
-        vertUsed[f.v[2]] = true;
-        if (f.v[3] != 0xFF) vertUsed[f.v[3]] = true;
-    }
-
-    std::vector<float> newVx, newVy, newVz;
-    std::vector<int> compactRemap(numV, -1);
-    for (size_t i = 0; i < numV; ++i) {
-        if (vertUsed[i]) {
-            compactRemap[i] = (int)newVx.size();
-            newVx.push_back(targetMesh->vx[i]);
-            newVy.push_back(targetMesh->vy[i]);
-            newVz.push_back(targetMesh->vz[i]);
-        }
-    }
-
-    targetMesh->vx = std::move(newVx);
-    targetMesh->vy = std::move(newVy);
-    targetMesh->vz = std::move(newVz);
-
-    for (auto& f : targetMesh->faces) {
-        f.v[0] = (uint8_t)compactRemap[f.v[0]];
-        f.v[1] = (uint8_t)compactRemap[f.v[1]];
-        f.v[2] = (uint8_t)compactRemap[f.v[2]];
-        if (f.v[3] != 0xFF) f.v[3] = (uint8_t)compactRemap[f.v[3]];
-    }
+    CompactMeshUnusedVertices(*targetMesh);
 
     if (history) {
         snap.after = *targetMesh;
@@ -803,96 +477,26 @@ bool WeldVertices(LocalGeometryOverlay& overlay, float tolerance, History* histo
 // DeleteSelectedVertices
 // ---------------------------------------------------------------------------
 bool DeleteSelectedVertices(LocalGeometryOverlay& overlay, History* history) {
-    auto selVerts = GetEffectiveSelectedVertices(overlay);
-    if (selVerts.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sv : selVerts) {
-        modifiedMeshes.insert({sv.chunkName, sv.objectIdx, sv.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> vertIndices;
-            for (const auto& sv : selVerts) {
-                if (sv.chunkName == cName && sv.objectIdx == oIdx && sv.meshIdx == mIdx)
-                    vertIndices.insert(sv.vertexIdx);
-            }
-
-            if (vertIndices.empty()) continue;
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Delete Vertices";
-            }
-
-            // Remove faces that reference any deleted vertex
+    bool anyModified = ForEachSelectedMeshVertices(overlay, history, "Delete Vertices",
+        [](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& vertIndices) {
+            std::set<int> delSet(vertIndices.begin(), vertIndices.end());
             std::vector<RenderFace> remainingFaces;
             for (const auto& f : mesh.faces) {
-                bool referencesDeleted = (vertIndices.find((int)f.v[0]) != vertIndices.end() ||
-                                          vertIndices.find((int)f.v[1]) != vertIndices.end() ||
-                                          vertIndices.find((int)f.v[2]) != vertIndices.end() ||
-                                          (f.v[3] != 0xFF && vertIndices.find((int)f.v[3]) != vertIndices.end()));
+                bool referencesDeleted = (delSet.count(f.v[0]) || delSet.count(f.v[1]) || delSet.count(f.v[2]) ||
+                                          (f.v[3] != 0xFF && delSet.count(f.v[3])));
                 if (!referencesDeleted) {
                     remainingFaces.push_back(f);
                 }
             }
             mesh.faces = std::move(remainingFaces);
-
-            // Compact vertices
-            std::vector<float> newVx, newVy, newVz;
-            std::vector<int> remap(mesh.vx.size(), -1);
-            for (size_t i = 0; i < mesh.vx.size(); ++i) {
-                if (vertIndices.find((int)i) == vertIndices.end()) {
-                    remap[i] = (int)newVx.size();
-                    newVx.push_back(mesh.vx[i]);
-                    newVy.push_back(mesh.vy[i]);
-                    newVz.push_back(mesh.vz[i]);
-                }
-            }
-
-            mesh.vx = std::move(newVx);
-            mesh.vy = std::move(newVy);
-            mesh.vz = std::move(newVz);
-
-            for (auto& f : mesh.faces) {
-                f.v[0] = (uint8_t)remap[f.v[0]];
-                f.v[1] = (uint8_t)remap[f.v[1]];
-                f.v[2] = (uint8_t)remap[f.v[2]];
-                if (f.v[3] != 0xFF) f.v[3] = (uint8_t)remap[f.v[3]];
-            }
-
-            if (history) {
-                snap.after = mesh;
-                history->Push(std::move(snap));
-            }
-
-            RecalculateBounds(overlay);
-            std::string ws = GetWorkspaceDir(overlay);
-            overlay.RebuildChunkBatches(cName, ws);
-            anyModified = true;
-        }
-    }
+            CompactMeshUnusedVertices(mesh);
+            return true;
+        });
 
     if (anyModified) {
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedVertices.clear();
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedVertexIdx = -1;
+        auto& mutableOverlay = const_cast<LocalGeometryOverlay&>(overlay);
+        mutableOverlay.m_selectedVertices.clear();
+        mutableOverlay.m_selectedVertexIdx = -1;
     }
     return anyModified;
 }

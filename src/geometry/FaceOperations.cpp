@@ -18,122 +18,50 @@
 
 namespace Geometry {
 
-static std::set<SelectedFace> GetEffectiveSelectedFaces(const LocalGeometryOverlay& overlay) {
-    std::set<SelectedFace> result = overlay.m_selectedFaces;
-    if (result.empty() && overlay.m_selectedFaceIdx >= 0 && !overlay.m_selectedChunk.empty() && overlay.m_selectedObjectIdx >= 0) {
-        result.insert({overlay.m_selectedChunk, overlay.m_selectedObjectIdx, overlay.m_selectedMeshIdx >= 0 ? overlay.m_selectedMeshIdx : 0, overlay.m_selectedFaceIdx});
-    }
-    return result;
-}
-
 // ---------------------------------------------------------------------------
 // TriangulateFaces
 // ---------------------------------------------------------------------------
 bool TriangulateFaces(LocalGeometryOverlay& overlay, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size())
-                continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Triangulate Quads";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Triangulate Quads",
+        [](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
+            std::set<int> fSet(faceIndices.begin(), faceIndices.end());
             std::vector<RenderFace> newFaces;
-            bool meshChanged = false;
+            bool changed = false;
 
             for (size_t fi = 0; fi < mesh.faces.size(); ++fi) {
                 const auto& f = mesh.faces[fi];
-                if (faceIndices.find((int)fi) != faceIndices.end() && f.v[3] != 0xFF) {
+                if (fSet.count((int)fi) && f.v[3] != 0xFF) {
                     // Tri 1: v0, v1, v2
                     RenderFace t1 = f;
-                    t1.v[0] = f.v[0];
-                    t1.v[1] = f.v[1];
-                    t1.v[2] = f.v[2];
-                    t1.v[3] = 0xFF;
-
+                    t1.v[0] = f.v[0]; t1.v[1] = f.v[1]; t1.v[2] = f.v[2]; t1.v[3] = 0xFF;
                     t1.uv[0][0] = f.uv[0][0]; t1.uv[0][1] = f.uv[0][1];
                     t1.uv[1][0] = f.uv[1][0]; t1.uv[1][1] = f.uv[1][1];
                     t1.uv[2][0] = f.uv[2][0]; t1.uv[2][1] = f.uv[2][1];
                     t1.uv[3][0] = 0.0f;       t1.uv[3][1] = 0.0f;
-
                     t1.rawU[0] = f.rawU[0]; t1.rawU[1] = f.rawU[1]; t1.rawU[2] = f.rawU[2]; t1.rawU[3] = f.rawU[0];
                     t1.rawV[0] = f.rawV[0]; t1.rawV[1] = f.rawV[1]; t1.rawV[2] = f.rawV[2]; t1.rawV[3] = f.rawV[0];
+                    t1.isDirty = true;
+                    newFaces.push_back(t1);
 
                     // Tri 2: v0, v2, v3
                     RenderFace t2 = f;
-                    t2.v[0] = f.v[0];
-                    t2.v[1] = f.v[2];
-                    t2.v[2] = f.v[3];
-                    t2.v[3] = 0xFF;
-
+                    t2.v[0] = f.v[0]; t2.v[1] = f.v[2]; t2.v[2] = f.v[3]; t2.v[3] = 0xFF;
                     t2.uv[0][0] = f.uv[0][0]; t2.uv[0][1] = f.uv[0][1];
                     t2.uv[1][0] = f.uv[2][0]; t2.uv[1][1] = f.uv[2][1];
                     t2.uv[2][0] = f.uv[3][0]; t2.uv[2][1] = f.uv[3][1];
                     t2.uv[3][0] = 0.0f;       t2.uv[3][1] = 0.0f;
-
                     t2.rawU[0] = f.rawU[0]; t2.rawU[1] = f.rawU[2]; t2.rawU[2] = f.rawU[3]; t2.rawU[3] = f.rawU[0];
                     t2.rawV[0] = f.rawV[0]; t2.rawV[1] = f.rawV[2]; t2.rawV[2] = f.rawV[3]; t2.rawV[3] = f.rawV[0];
-
-                    t1.isDirty = true;
-newFaces.push_back(t1);
                     t2.isDirty = true;
-newFaces.push_back(t2);
-                    meshChanged = true;
+                    newFaces.push_back(t2);
+                    changed = true;
                 } else {
                     newFaces.push_back(f);
                 }
             }
-
-            if (meshChanged) {
-                mesh.faces = std::move(newFaces);
-                anyModified = true;
-
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-            }
-        }
-    }
-
-    if (anyModified) {
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedFaces.clear();
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedFaceIdx = -1;
-    }
-    return anyModified;
+            if (changed) mesh.faces = std::move(newFaces);
+            return changed;
+        }, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,110 +71,87 @@ bool ConnectBridgeFaces(LocalGeometryOverlay& overlay, History* history) {
     auto selFaces = GetEffectiveSelectedFaces(overlay);
     if (selFaces.size() < 2) return false;
 
-    // Look for 2 selected triangles in the same mesh
-    std::string cName;
-    int oIdx = -1, mIdx = -1;
-    std::vector<int> faceIndices;
+    LoadedChunk* lc = nullptr;
+    RenderObject* obj = nullptr;
+    RenderMesh* mesh = nullptr;
+    if (!GetActiveMeshTarget(overlay, lc, obj, mesh) || !lc || !mesh) return false;
 
+    int mIdx = overlay.m_selectedMeshIdx >= 0 ? overlay.m_selectedMeshIdx : 0;
+    std::vector<int> faceIndices;
     for (const auto& sf : selFaces) {
-        if (cName.empty()) {
-            cName = sf.chunkName; oIdx = sf.objectIdx; mIdx = sf.meshIdx;
-        }
-        if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx) {
+        if (sf.chunkName == lc->data->chunkName && sf.objectIdx == overlay.m_selectedObjectIdx && sf.meshIdx == mIdx) {
             faceIndices.push_back(sf.faceIdx);
         }
     }
-
     if (faceIndices.size() < 2) return false;
 
-    for (const auto& lcConst : overlay.GetChunks()) {
-        auto& lc = const_cast<LoadedChunk&>(lcConst);
-        if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-        auto& obj = lc.data->objects[oIdx];
-        if (mIdx >= (int)obj.meshes.size()) break;
-        auto& mesh = obj.meshes[mIdx];
+    int f1Idx = faceIndices[0];
+    int f2Idx = faceIndices[1];
+    if (f1Idx >= (int)mesh->faces.size() || f2Idx >= (int)mesh->faces.size()) return false;
 
-        int f1Idx = faceIndices[0];
-        int f2Idx = faceIndices[1];
-        if (f1Idx >= (int)mesh.faces.size() || f2Idx >= (int)mesh.faces.size()) continue;
+    const auto& f1 = mesh->faces[f1Idx];
+    const auto& f2 = mesh->faces[f2Idx];
+    if (f1.v[3] != 0xFF || f2.v[3] != 0xFF) return false;
 
-        const auto& f1 = mesh.faces[f1Idx];
-        const auto& f2 = mesh.faces[f2Idx];
+    std::vector<uint8_t> sharedVerts;
+    uint8_t unshared1 = 0xFF, unshared2 = 0xFF;
 
-        // Check if both are triangles
-        if (f1.v[3] != 0xFF || f2.v[3] != 0xFF) continue;
-
-        // Find shared vertices between f1 (v0,v1,v2) and f2 (v0,v1,v2)
-        std::vector<uint8_t> sharedVerts;
-        uint8_t unshared1 = 0xFF;
-        uint8_t unshared2 = 0xFF;
-
-        for (int i = 0; i < 3; ++i) {
-            uint8_t v = f1.v[i];
-            bool shared = false;
-            for (int j = 0; j < 3; ++j) {
-                if (v == f2.v[j]) { shared = true; break; }
-            }
-            if (shared) sharedVerts.push_back(v);
-            else unshared1 = v;
-        }
-
+    for (int i = 0; i < 3; ++i) {
+        uint8_t v = f1.v[i];
+        bool shared = false;
         for (int j = 0; j < 3; ++j) {
-            uint8_t v = f2.v[j];
-            bool shared = false;
-            for (int i = 0; i < 3; ++i) {
-                if (v == f1.v[i]) { shared = true; break; }
-            }
-            if (!shared) unshared2 = v;
+            if (v == f2.v[j]) { shared = true; break; }
         }
-
-        if (sharedVerts.size() != 2 || unshared1 == 0xFF || unshared2 == 0xFF) continue;
-
-        MeshSnapshot snap;
-        if (history) {
-            snap.chunkName = cName;
-            snap.objectIdx = oIdx;
-            snap.meshIdx = mIdx;
-            snap.before = mesh;
-            snap.description = "Bridge Faces to Quad";
-        }
-
-        // Build new Quad: unshared1 -> sharedVerts[0] -> unshared2 -> sharedVerts[1]
-        RenderFace quad = f1;
-        quad.v[0] = unshared1;
-        quad.v[1] = sharedVerts[0];
-        quad.v[2] = unshared2;
-        quad.v[3] = sharedVerts[1];
-
-        quad.uv[0][0] = 0.0f; quad.uv[0][1] = 0.0f;
-        quad.uv[1][0] = 1.0f; quad.uv[1][1] = 0.0f;
-        quad.uv[2][0] = 1.0f; quad.uv[2][1] = 1.0f;
-        quad.uv[3][0] = 0.0f; quad.uv[3][1] = 1.0f;
-
-        quad.rawU[0] = 0;   quad.rawU[1] = 255; quad.rawU[2] = 255; quad.rawU[3] = 0;
-        quad.rawV[0] = 0;   quad.rawV[1] = 0;   quad.rawV[2] = 255; quad.rawV[3] = 255;
-
-        // Erase the two triangles and insert quad
-        int maxIdx = std::max(f1Idx, f2Idx);
-        int minIdx = std::min(f1Idx, f2Idx);
-        mesh.faces.erase(mesh.faces.begin() + maxIdx);
-        mesh.faces.erase(mesh.faces.begin() + minIdx);
-        quad.isDirty = true;
-mesh.faces.push_back(quad);
-
-        if (history) {
-            snap.after = mesh;
-            history->Push(std::move(snap));
-        }
-
-        std::string ws = GetWorkspaceDir(overlay);
-        overlay.RebuildChunkBatches(cName, ws);
-
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedFaces.clear();
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedFaceIdx = -1;
-        return true;
+        if (shared) sharedVerts.push_back(v);
+        else unshared1 = v;
     }
-    return false;
+
+    for (int j = 0; j < 3; ++j) {
+        uint8_t v = f2.v[j];
+        bool shared = false;
+        for (int i = 0; i < 3; ++i) {
+            if (v == f1.v[i]) { shared = true; break; }
+        }
+        if (!shared) unshared2 = v;
+    }
+
+    if (sharedVerts.size() != 2 || unshared1 == 0xFF || unshared2 == 0xFF) return false;
+
+    MeshSnapshot snap;
+    if (history) {
+        snap.chunkName = lc->data->chunkName;
+        snap.objectIdx = overlay.m_selectedObjectIdx;
+        snap.meshIdx = mIdx;
+        snap.before = *mesh;
+        snap.description = "Bridge Faces to Quad";
+    }
+
+    RenderFace quad = f1;
+    quad.v[0] = unshared1;
+    quad.v[1] = sharedVerts[0];
+    quad.v[2] = unshared2;
+    quad.v[3] = sharedVerts[1];
+    ResetFaceDefaultUV(quad.uv, quad.rawU, quad.rawV, 4);
+
+    int maxIdx = std::max(f1Idx, f2Idx);
+    int minIdx = std::min(f1Idx, f2Idx);
+    mesh->faces.erase(mesh->faces.begin() + maxIdx);
+    mesh->faces.erase(mesh->faces.begin() + minIdx);
+    quad.isDirty = true;
+    mesh->faces.push_back(quad);
+
+    if (history) {
+        snap.after = *mesh;
+        history->Push(std::move(snap));
+    }
+
+    std::string ws = GetWorkspaceDir(overlay);
+    overlay.RebuildChunkBatches(lc->data->chunkName, ws);
+
+    auto& mutableOverlay = const_cast<LocalGeometryOverlay&>(overlay);
+    mutableOverlay.m_selectedFaces.clear();
+    mutableOverlay.m_selectedFaceIdx = -1;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,11 +189,12 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
             if (mIdx >= (int)obj.meshes.size()) break;
             auto& mesh = obj.meshes[mIdx];
 
-            std::set<int> faceIndices;
+            std::vector<int> faceIndices;
             for (const auto& sf : selFaces) {
                 if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
+                    faceIndices.push_back(sf.faceIdx);
             }
+            if (faceIndices.empty()) continue;
 
             MeshSnapshot snap;
             if (history) {
@@ -308,14 +214,9 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                 bool isQuad = (origFace.v[3] != 0xFF);
                 int numV = isQuad ? 4 : 3;
 
-                // Compute normal
-                Vector3 v0 = { mesh.vx[origFace.v[0]], mesh.vy[origFace.v[0]], mesh.vz[origFace.v[0]] };
-                Vector3 v1 = { mesh.vx[origFace.v[1]], mesh.vy[origFace.v[1]], mesh.vz[origFace.v[1]] };
-                Vector3 v2 = { mesh.vx[origFace.v[2]], mesh.vy[origFace.v[2]], mesh.vz[origFace.v[2]] };
-                Vector3 norm = ComputeTriangleNormal(v0, v1, v2);
+                Vector3 norm = ComputeFaceNormal(mesh, origFace);
                 Vector3 offset = Vector3Scale(norm, distance);
 
-                // Create new extruded vertices
                 if (mesh.vx.size() + numV > 255) {
                     printf("[Geometry] Vertex limit (255) reached, skipping extrusion for face %d\n", fIdx);
                     continue;
@@ -324,10 +225,7 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                 std::vector<uint8_t> newVIndices;
                 for (int i = 0; i < numV; ++i) {
                     uint8_t oldIdx = origFace.v[i];
-                    uint8_t newIdx = (uint8_t)mesh.vx.size();
-                    mesh.vx.push_back(mesh.vx[oldIdx] + offset.x);
-                    mesh.vy.push_back(mesh.vy[oldIdx] + offset.y);
-                    mesh.vz.push_back(mesh.vz[oldIdx] + offset.z);
+                    uint8_t newIdx = AddMeshVertex(mesh, Vector3Add(GetMeshVertex(mesh, oldIdx), offset));
                     newVIndices.push_back(newIdx);
                 }
 
@@ -373,7 +271,7 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                         }
 
                         side.isDirty = true;
-sideQuads.push_back(side);
+                        sideQuads.push_back(side);
                     }
                 }
 
@@ -388,7 +286,7 @@ sideQuads.push_back(side);
 
                 // Replace the original face with the new cap face
                 capFace.isDirty = true;
-mesh.faces[fIdx] = capFace;
+                mesh.faces[fIdx] = capFace;
 
                 newGlobalSelectedFaces.insert({ cName, oIdx, mIdx, fIdx });
                 if (newPrimarySelectedFace < 0) newPrimarySelectedFace = fIdx;
@@ -429,43 +327,8 @@ mesh.faces[fIdx] = capFace;
 // InvertNormals
 // ---------------------------------------------------------------------------
 bool InvertNormals(LocalGeometryOverlay& overlay, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Invert Normals";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Invert Normals",
+        [](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             bool changed = false;
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
@@ -474,120 +337,30 @@ bool InvertNormals(LocalGeometryOverlay& overlay, History* history) {
                 face.isDirty = true;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // DeleteFaces
 // ---------------------------------------------------------------------------
 bool DeleteFaces(LocalGeometryOverlay& overlay, bool deleteIsolatedVertices, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = deleteIsolatedVertices ? "Delete Faces & Vertices" : "Delete Faces";
-            }
-
+    const char* desc = deleteIsolatedVertices ? "Delete Faces & Vertices" : "Delete Faces";
+    return ForEachSelectedMeshFaces(overlay, history, desc,
+        [deleteIsolatedVertices](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
+            std::set<int> delSet(faceIndices.begin(), faceIndices.end());
             std::vector<RenderFace> remainingFaces;
             for (size_t fi = 0; fi < mesh.faces.size(); ++fi) {
-                if (faceIndices.find((int)fi) == faceIndices.end()) {
+                if (!delSet.count((int)fi)) {
                     remainingFaces.push_back(mesh.faces[fi]);
                 }
             }
             mesh.faces = std::move(remainingFaces);
-
             if (deleteIsolatedVertices) {
-                std::vector<bool> vertUsed(mesh.vx.size(), false);
-                for (const auto& f : mesh.faces) {
-                    vertUsed[f.v[0]] = true;
-                    vertUsed[f.v[1]] = true;
-                    vertUsed[f.v[2]] = true;
-                    if (f.v[3] != 0xFF) vertUsed[f.v[3]] = true;
-                }
-
-                std::vector<float> newVx, newVy, newVz;
-                std::vector<int> remap(mesh.vx.size(), -1);
-                for (size_t vi = 0; vi < mesh.vx.size(); ++vi) {
-                    if (vertUsed[vi]) {
-                        remap[vi] = (int)newVx.size();
-                        newVx.push_back(mesh.vx[vi]);
-                        newVy.push_back(mesh.vy[vi]);
-                        newVz.push_back(mesh.vz[vi]);
-                    }
-                }
-
-                mesh.vx = std::move(newVx);
-                mesh.vy = std::move(newVy);
-                mesh.vz = std::move(newVz);
-
-                for (auto& f : mesh.faces) {
-                    f.v[0] = (uint8_t)remap[f.v[0]];
-                    f.v[1] = (uint8_t)remap[f.v[1]];
-                    f.v[2] = (uint8_t)remap[f.v[2]];
-                    if (f.v[3] != 0xFF) f.v[3] = (uint8_t)remap[f.v[3]];
-                }
+                CompactMeshUnusedVertices(mesh);
             }
-
-            if (history) {
-                snap.after = mesh;
-                history->Push(std::move(snap));
-            }
-
-            RecalculateBounds(overlay);
-            std::string ws = GetWorkspaceDir(overlay);
-            overlay.RebuildChunkBatches(cName, ws);
-            anyModified = true;
-        }
-    }
-
-    if (anyModified) {
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedFaces.clear();
-        const_cast<LocalGeometryOverlay&>(overlay).m_selectedFaceIdx = -1;
-    }
-    return anyModified;
+            return true;
+        }, true, deleteIsolatedVertices);
 }
 
 // ---------------------------------------------------------------------------
@@ -598,43 +371,8 @@ bool PaintFaces(LocalGeometryOverlay& overlay, History* history) {
     const auto& currentTile = overlay.m_texManager->GetCurrentTile();
     if (currentTile.texName.empty()) return false;
 
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Paint Faces";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Paint Faces",
+        [&currentTile](LoadedChunk& lc, RenderObject& obj, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             uint8_t texNum = 0x7F;
             const auto& texList = obj.isGlobal ? lc.data->globalTexNames : lc.data->localTexNames;
             for (size_t i = 0; i < texList.size(); i++) {
@@ -679,66 +417,18 @@ bool PaintFaces(LocalGeometryOverlay& overlay, History* history) {
                 }
 
                 face.isDirty = true;
-
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // ClearTexture
 // ---------------------------------------------------------------------------
 bool ClearTexture(LocalGeometryOverlay& overlay, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Clear Texture";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Clear Texture",
+        [](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             bool changed = false;
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
@@ -749,130 +439,35 @@ bool ClearTexture(LocalGeometryOverlay& overlay, History* history) {
                 face.isDirty = true;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // RotateUV
 // ---------------------------------------------------------------------------
 bool RotateUV(LocalGeometryOverlay& overlay, int steps, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Rotate UV";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Rotate UV",
+        [steps](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             bool changed = false;
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
                 auto& face = mesh.faces[fIdx];
                 int numV = (face.v[3] != 0xFF) ? 4 : 3;
-
                 RotatePolygonUv(face.uv, face.rawU, face.rawV, numV, steps);
                 face.isDirty = true;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // FlipUV
 // ---------------------------------------------------------------------------
 bool FlipUV(LocalGeometryOverlay& overlay, bool horizontal, bool vertical, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Flip UV";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Flip UV",
+        [horizontal, vertical](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             bool changed = false;
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
@@ -895,63 +490,16 @@ bool FlipUV(LocalGeometryOverlay& overlay, bool horizontal, bool vertical, Histo
                 face.isDirty = true;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // FitUVToTileBounds
 // ---------------------------------------------------------------------------
 bool FitUVToTileBounds(LocalGeometryOverlay& overlay, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Fit UV to Tile Bounds";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Fit UV to Tile Bounds",
+        [](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             bool changed = false;
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
@@ -975,102 +523,27 @@ bool FitUVToTileBounds(LocalGeometryOverlay& overlay, History* history) {
                 face.isDirty = true;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 // ---------------------------------------------------------------------------
 // ResetDefaultUV
 // ---------------------------------------------------------------------------
 bool ResetDefaultUV(LocalGeometryOverlay& overlay, History* history) {
-    auto selFaces = GetEffectiveSelectedFaces(overlay);
-    if (selFaces.empty()) return false;
-
-    std::set<std::tuple<std::string, int, int>> modifiedMeshes;
-    for (const auto& sf : selFaces) {
-        modifiedMeshes.insert({sf.chunkName, sf.objectIdx, sf.meshIdx});
-    }
-
-    bool anyModified = false;
-
-    for (const auto& mRef : modifiedMeshes) {
-        const std::string& cName = std::get<0>(mRef);
-        int oIdx = std::get<1>(mRef);
-        int mIdx = std::get<2>(mRef);
-
-        for (const auto& lcConst : overlay.GetChunks()) {
-            auto& lc = const_cast<LoadedChunk&>(lcConst);
-            if (lc.data->chunkName != cName || oIdx >= (int)lc.data->objects.size()) continue;
-            auto& obj = lc.data->objects[oIdx];
-            if (mIdx >= (int)obj.meshes.size()) break;
-            auto& mesh = obj.meshes[mIdx];
-
-            std::set<int> faceIndices;
-            for (const auto& sf : selFaces) {
-                if (sf.chunkName == cName && sf.objectIdx == oIdx && sf.meshIdx == mIdx)
-                    faceIndices.insert(sf.faceIdx);
-            }
-
-            MeshSnapshot snap;
-            if (history) {
-                snap.chunkName = cName;
-                snap.objectIdx = oIdx;
-                snap.meshIdx = mIdx;
-                snap.before = mesh;
-                snap.description = "Reset Default UV";
-            }
-
+    return ForEachSelectedMeshFaces(overlay, history, "Reset Default UV",
+        [](LoadedChunk&, RenderObject&, RenderMesh& mesh, const std::vector<int>& faceIndices) {
             bool changed = false;
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
                 auto& face = mesh.faces[fIdx];
-                bool isQuad = (face.v[3] != 0xFF);
-
-                if (isQuad) {
-                    face.uv[0][0] = 0.0f; face.uv[0][1] = 0.0f;
-                    face.uv[1][0] = 1.0f; face.uv[1][1] = 0.0f;
-                    face.uv[2][0] = 1.0f; face.uv[2][1] = 1.0f;
-                    face.uv[3][0] = 0.0f; face.uv[3][1] = 1.0f;
-
-                    face.rawU[0] = 0;   face.rawU[1] = 255; face.rawU[2] = 255; face.rawU[3] = 0;
-                    face.rawV[0] = 0;   face.rawV[1] = 0;   face.rawV[2] = 255; face.rawV[3] = 255;
-                } else {
-                    face.uv[0][0] = 0.0f; face.uv[0][1] = 0.0f;
-                    face.uv[1][0] = 1.0f; face.uv[1][1] = 0.0f;
-                    face.uv[2][0] = 1.0f; face.uv[2][1] = 1.0f;
-
-                    face.rawU[0] = 0;   face.rawU[1] = 255; face.rawU[2] = 255;
-                    face.rawV[0] = 0;   face.rawV[1] = 0;   face.rawV[2] = 255;
-                }
+                int numV = (face.v[3] != 0xFF) ? 4 : 3;
+                ResetFaceDefaultUV(face.uv, face.rawU, face.rawV, numV);
                 face.isDirty = true;
                 changed = true;
             }
-
-            if (changed) {
-                if (history) {
-                    snap.after = mesh;
-                    history->Push(std::move(snap));
-                }
-
-                std::string ws = GetWorkspaceDir(overlay);
-                overlay.RebuildChunkBatches(cName, ws);
-                anyModified = true;
-            }
-        }
-    }
-    return anyModified;
+            return changed;
+        });
 }
 
 } // namespace Geometry

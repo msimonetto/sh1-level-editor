@@ -84,6 +84,25 @@ void RotatePolygonUv(float uv[4][2], uint8_t rawU[4], uint8_t rawV[4], int numVe
     }
 }
 
+void ResetFaceDefaultUV(float uv[4][2], uint8_t rawU[4], uint8_t rawV[4], int numVerts) {
+    if (numVerts >= 4) {
+        uv[0][0] = 0.0f; uv[0][1] = 0.0f;
+        uv[1][0] = 1.0f; uv[1][1] = 0.0f;
+        uv[2][0] = 1.0f; uv[2][1] = 1.0f;
+        uv[3][0] = 0.0f; uv[3][1] = 1.0f;
+
+        rawU[0] = 0; rawU[1] = 255; rawU[2] = 255; rawU[3] = 0;
+        rawV[0] = 0; rawV[1] = 0;   rawV[2] = 255; rawV[3] = 255;
+    } else {
+        uv[0][0] = 0.0f; uv[0][1] = 0.0f;
+        uv[1][0] = 1.0f; uv[1][1] = 0.0f;
+        uv[2][0] = 1.0f; uv[2][1] = 1.0f;
+
+        rawU[0] = 0; rawU[1] = 255; rawU[2] = 255;
+        rawV[0] = 0; rawV[1] = 0;   rawV[2] = 255;
+    }
+}
+
 // Matrix algebra utilities
 void Matrix3x3Multiply(const float a[3][3], const float b[3][3], float out[3][3]) {
     float res[3][3] = {};
