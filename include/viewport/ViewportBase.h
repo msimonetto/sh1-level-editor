@@ -30,53 +30,12 @@ struct GpuBatch {
     Material  material;
     bool      meshUploaded;
     
-    GpuBatch() : texName(""), paletteRow(0), mesh{0}, material{0}, meshUploaded(false) {}
-    
+    GpuBatch() = default;
     GpuBatch(const GpuBatch&) = delete;
     GpuBatch& operator=(const GpuBatch&) = delete;
-    
-    GpuBatch(GpuBatch&& other) noexcept 
-        : texName(std::move(other.texName)), paletteRow(other.paletteRow),
-          mesh(other.mesh), material(other.material), meshUploaded(other.meshUploaded) {
-        other.meshUploaded = false;
-        other.mesh = {0};
-        other.material = {0};
-    }
-    
-    GpuBatch& operator=(GpuBatch&& other) noexcept {
-        if (this != &other) {
-            if (meshUploaded) {
-                UnloadMesh(mesh);
-                if (material.maps != nullptr) {
-                    material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
-                    material.shader.id = rlGetShaderIdDefault();
-                    UnloadMaterial(material);
-                }
-            }
-            texName = std::move(other.texName);
-            paletteRow = other.paletteRow;
-            mesh = other.mesh;
-            material = other.material;
-            meshUploaded = other.meshUploaded;
-            
-            other.meshUploaded = false;
-            other.mesh = {0};
-            other.material = {0};
-        }
-        return *this;
-    }
-    
-    ~GpuBatch() {
-        if (meshUploaded) {
-            UnloadMesh(mesh);
-            if (material.maps != nullptr) {
-                material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
-                material.shader.id = rlGetShaderIdDefault();
-                UnloadMaterial(material);
-            }
-            meshUploaded = false;
-        }
-    }
+    GpuBatch(GpuBatch&& other) noexcept;
+    GpuBatch& operator=(GpuBatch&& other) noexcept;
+    ~GpuBatch();
 };
 
 struct LoadedChunk {
@@ -139,21 +98,7 @@ public:
 
     void ResetCamera();
 
-    void SetCameraState(const ViewportCameraState& state) {
-        if (m_projMode != state.projMode) {
-            // Only sync target and zoom if projection modes differ, keep rotation decoupled
-            m_camera.target = state.target;
-            m_distance = state.distance;
-        } else {
-            // Sync fully
-            m_azimuth = state.azimuth;
-            m_elevation = state.elevation;
-            m_distance = state.distance;
-            m_camera.target = state.target;
-            m_projMode = state.projMode;
-        }
-        UpdateCameraVectors();
-    }
+    void SetCameraState(const ViewportCameraState& state);
 
     // Draw the ImGui panel (call between rlImGuiBegin / rlImGuiEnd)
     virtual void Draw();

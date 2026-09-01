@@ -7,6 +7,52 @@
 #include <cstdio>
 
 // ---------------------------------------------------------------------------
+// GpuBatch RAII Lifecycle
+// ---------------------------------------------------------------------------
+GpuBatch::GpuBatch(GpuBatch&& other) noexcept 
+    : texName(std::move(other.texName)), paletteRow(other.paletteRow),
+      mesh(other.mesh), material(other.material), meshUploaded(other.meshUploaded) {
+    other.meshUploaded = false;
+    other.mesh = {0};
+    other.material = {0};
+}
+
+GpuBatch& GpuBatch::operator=(GpuBatch&& other) noexcept {
+    if (this != &other) {
+        if (meshUploaded) {
+            UnloadMesh(mesh);
+            if (material.maps != nullptr) {
+                material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
+                material.shader.id = rlGetShaderIdDefault();
+                UnloadMaterial(material);
+            }
+        }
+        texName = std::move(other.texName);
+        paletteRow = other.paletteRow;
+        mesh = other.mesh;
+        material = other.material;
+        meshUploaded = other.meshUploaded;
+        
+        other.meshUploaded = false;
+        other.mesh = {0};
+        other.material = {0};
+    }
+    return *this;
+}
+
+GpuBatch::~GpuBatch() {
+    if (meshUploaded) {
+        UnloadMesh(mesh);
+        if (material.maps != nullptr) {
+            material.maps[MATERIAL_MAP_DIFFUSE].texture = {0};
+            material.shader.id = rlGetShaderIdDefault();
+            UnloadMaterial(material);
+        }
+        meshUploaded = false;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Construction / destruction
 // ---------------------------------------------------------------------------
 
@@ -59,6 +105,22 @@ void ViewportBase::ResetCamera() {
   m_camera.up = {0.0f, 1.0f, 0.0f};
   m_camera.fovy = 60.0f;
   m_camera.projection = CAMERA_PERSPECTIVE;
+  UpdateCameraVectors();
+}
+
+void ViewportBase::SetCameraState(const ViewportCameraState& state) {
+  if (m_projMode != state.projMode) {
+    // Only sync target and zoom if projection modes differ, keep rotation decoupled
+    m_camera.target = state.target;
+    m_distance = state.distance;
+  } else {
+    // Sync fully
+    m_azimuth = state.azimuth;
+    m_elevation = state.elevation;
+    m_distance = state.distance;
+    m_camera.target = state.target;
+    m_projMode = state.projMode;
+  }
   UpdateCameraVectors();
 }
 

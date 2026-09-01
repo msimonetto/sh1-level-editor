@@ -18,37 +18,9 @@ struct CollisionBatch {
     CollisionBatch() = default;
     CollisionBatch(const CollisionBatch&) = delete;
     CollisionBatch& operator=(const CollisionBatch&) = delete;
-    
-    CollisionBatch(CollisionBatch&& other) noexcept 
-        : mesh(other.mesh), material(other.material), meshUploaded(other.meshUploaded) {
-        other.meshUploaded = false;
-        other.mesh = {0};
-        other.material = {0};
-    }
-    
-    CollisionBatch& operator=(CollisionBatch&& other) noexcept {
-        if (this != &other) {
-            if (meshUploaded) {
-                UnloadMesh(mesh);
-                UnloadMaterial(material);
-            }
-            mesh = other.mesh;
-            material = other.material;
-            meshUploaded = other.meshUploaded;
-            
-            other.meshUploaded = false;
-            other.mesh = {0};
-            other.material = {0};
-        }
-        return *this;
-    }
-    
-    ~CollisionBatch() {
-        if (meshUploaded) {
-            UnloadMesh(mesh);
-            meshUploaded = false;
-        }
-    }
+    CollisionBatch(CollisionBatch&& other) noexcept;
+    CollisionBatch& operator=(CollisionBatch&& other) noexcept;
+    ~CollisionBatch();
 };
 
 struct CollisionChunkData {

@@ -29,13 +29,7 @@ public:
   void ForceReloadChunk(const std::string &chunk, class Viewport &sceneViewport,
                         LocalGeometryOverlay &localGeometryOverlay);
 
-  bool GetLoadingProgress(int &outFinished, int &outTotal) const {
-    if (m_loadingChunks.empty())
-      return false;
-    outFinished = m_finishedTasks;
-    outTotal = m_totalLoadingTasks;
-    return true;
-  }
+  bool GetLoadingProgress(int &outFinished, int &outTotal) const;
 
 private:
   std::vector<std::string> lastViewportChunks;

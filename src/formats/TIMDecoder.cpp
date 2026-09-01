@@ -1,6 +1,71 @@
 #include "formats/TIMDecoder.h"
 #include <cstdio>
 
+// ---------------------------------------------------------------------------
+// TIMColor Implementation
+// ---------------------------------------------------------------------------
+bool TIMColor::operator==(const TIMColor &o) const {
+    return r == o.r && g == o.g && b == o.b && a == o.a;
+}
+
+bool TIMColor::operator!=(const TIMColor &o) const {
+    return !(*this == o);
+}
+
+void TIMColor::ToR5G5B5(int &outR5, int &outG5, int &outB5, bool &outStp) const {
+    outR5 = (int)r * 31 / 255;
+    outG5 = (int)g * 31 / 255;
+    outB5 = (int)b * 31 / 255;
+    outStp = (a == 0) ? false : (a < 255 || (r == 0 && g == 0 && b == 0));
+}
+
+TIMColor TIMColor::FromR5G5B5(int r5, int g5, int b5, bool stp) {
+    uint8_t r8 = (uint8_t)(r5 * 255 / 31);
+    uint8_t g8 = (uint8_t)(g5 * 255 / 31);
+    uint8_t b8 = (uint8_t)(b5 * 255 / 31);
+    uint8_t a8 = 255;
+    if (r5 == 0 && g5 == 0 && b5 == 0 && !stp) {
+        a8 = 0; // Pure 0x0000 is transparent
+    } else if (stp && (r5 != 0 || g5 != 0 || b5 != 0)) {
+        a8 = 180; // Semi-transparent
+    }
+    return {r8, g8, b8, a8};
+}
+
+// ---------------------------------------------------------------------------
+// TIMPalette Implementation
+// ---------------------------------------------------------------------------
+bool TIMPalette::operator==(const TIMPalette &o) const {
+    return colors == o.colors;
+}
+
+bool TIMPalette::operator!=(const TIMPalette &o) const {
+    return !(*this == o);
+}
+
+// ---------------------------------------------------------------------------
+// DecodedTIM Implementation
+// ---------------------------------------------------------------------------
+bool DecodedTIM::operator==(const DecodedTIM &o) const {
+    return width == o.width &&
+           height == o.height &&
+           bpp == o.bpp &&
+           clutX == o.clutX &&
+           clutY == o.clutY &&
+           imgX == o.imgX &&
+           imgY == o.imgY &&
+           palettes == o.palettes &&
+           rawIndices == o.rawIndices &&
+           directPixels == o.directPixels;
+}
+
+bool DecodedTIM::operator!=(const DecodedTIM &o) const {
+    return !(*this == o);
+}
+
+// ---------------------------------------------------------------------------
+// TIMDecoder Implementation
+// ---------------------------------------------------------------------------
 TIMColor TIMDecoder::WordToColor(uint16_t word) {
     uint8_t r = (word & 0x001F) * 255 / 31;
     uint8_t g = ((word & 0x03E0) >> 5) * 255 / 31;

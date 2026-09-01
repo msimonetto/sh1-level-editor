@@ -156,3 +156,11 @@ void ViewportSync::ForceReloadChunk(const std::string &chunk,
     }
   }
 }
+
+bool ViewportSync::GetLoadingProgress(int &outFinished, int &outTotal) const {
+  if (m_loadingChunks.empty())
+    return false;
+  outFinished = m_finishedTasks;
+  outTotal = m_totalLoadingTasks;
+  return true;
+}

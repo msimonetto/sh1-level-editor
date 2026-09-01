@@ -102,7 +102,7 @@ private:
                                 const std::vector<uint8_t>& buf);
 
     // Little-endian helpers
-    static inline int32_t  ReadI32(const std::vector<uint8_t>& buf, int off) {
+    static inline int32_t ReadI32(const std::vector<uint8_t>& buf, int off) {
         int32_t v; memcpy(&v, buf.data() + off, 4); return v;
     }
     static inline void WriteI32(std::vector<uint8_t>& buf, int off, int32_t v) {

@@ -11,9 +11,18 @@
 #include "extras/IconsFontAwesome6.h"
 #include "core/ResourceFilter.h"
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+bool TextureMapPanel::SelectedTile::operator==(const SelectedTile &other) const {
+  return (texName == other.texName && palette == other.palette &&
+          std::abs(minU - other.minU) < 0.001f &&
+          std::abs(minV - other.minV) < 0.001f &&
+          std::abs(maxU - other.maxU) < 0.001f &&
+          std::abs(maxV - other.maxV) < 0.001f);
+}
 
 void TextureMapPanel::SaveRecentTiles(const std::string &workspaceDir) {
   std::string path = workspaceDir + "/recent_tiles.json";

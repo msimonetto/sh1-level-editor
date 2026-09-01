@@ -6,6 +6,40 @@
 
 #include "viewport/Viewport.h"
 
+// ---------------------------------------------------------------------------
+// CollisionBatch RAII Lifecycle
+// ---------------------------------------------------------------------------
+CollisionBatch::CollisionBatch(CollisionBatch&& other) noexcept 
+    : mesh(other.mesh), material(other.material), meshUploaded(other.meshUploaded) {
+    other.meshUploaded = false;
+    other.mesh = {0};
+    other.material = {0};
+}
+
+CollisionBatch& CollisionBatch::operator=(CollisionBatch&& other) noexcept {
+    if (this != &other) {
+        if (meshUploaded) {
+            UnloadMesh(mesh);
+            UnloadMaterial(material);
+        }
+        mesh = other.mesh;
+        material = other.material;
+        meshUploaded = other.meshUploaded;
+        
+        other.meshUploaded = false;
+        other.mesh = {0};
+        other.material = {0};
+    }
+    return *this;
+}
+
+CollisionBatch::~CollisionBatch() {
+    if (meshUploaded) {
+        UnloadMesh(mesh);
+        meshUploaded = false;
+    }
+}
+
 void CollisionOverlay::HandlePicking(Viewport& vp, Ray ray) {
   // Stub for future collision data selection
   // Allows selecting collision cells or surfaces by intersecting ray with

@@ -20,15 +20,7 @@ struct SelectedVertex {
   int meshIdx;
   int vertexIdx;
 
-  bool operator<(const SelectedVertex &o) const {
-    if (chunkName != o.chunkName)
-      return chunkName < o.chunkName;
-    if (objectIdx != o.objectIdx)
-      return objectIdx < o.objectIdx;
-    if (meshIdx != o.meshIdx)
-      return meshIdx < o.meshIdx;
-    return vertexIdx < o.vertexIdx;
-  }
+  bool operator<(const SelectedVertex &o) const;
 };
 
 struct SelectedFace {
@@ -37,15 +29,7 @@ struct SelectedFace {
   int meshIdx;
   int faceIdx;
 
-  bool operator<(const SelectedFace &o) const {
-    if (chunkName != o.chunkName)
-      return chunkName < o.chunkName;
-    if (objectIdx != o.objectIdx)
-      return objectIdx < o.objectIdx;
-    if (meshIdx != o.meshIdx)
-      return meshIdx < o.meshIdx;
-    return faceIdx < o.faceIdx;
-  }
+  bool operator<(const SelectedFace &o) const;
 };
 
 class Viewport;

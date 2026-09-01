@@ -20,6 +20,26 @@
 #include <cstdio>
 #include <cstring>
 
+bool SelectedVertex::operator<(const SelectedVertex &o) const {
+  if (chunkName != o.chunkName)
+    return chunkName < o.chunkName;
+  if (objectIdx != o.objectIdx)
+    return objectIdx < o.objectIdx;
+  if (meshIdx != o.meshIdx)
+    return meshIdx < o.meshIdx;
+  return vertexIdx < o.vertexIdx;
+}
+
+bool SelectedFace::operator<(const SelectedFace &o) const {
+  if (chunkName != o.chunkName)
+    return chunkName < o.chunkName;
+  if (objectIdx != o.objectIdx)
+    return objectIdx < o.objectIdx;
+  if (meshIdx != o.meshIdx)
+    return meshIdx < o.meshIdx;
+  return faceIdx < o.faceIdx;
+}
+
 static Vector3 GetDominantAxis(Vector3 v) {
   Vector3 absV = {fabsf(v.x), fabsf(v.y), fabsf(v.z)};
   if (absV.x > absV.y && absV.x > absV.z)

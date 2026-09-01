@@ -34,13 +34,7 @@ public:
     int palette;
     bool isPinned = false;
 
-    bool operator==(const SelectedTile &other) const {
-      return (texName == other.texName && palette == other.palette &&
-              std::abs(minU - other.minU) < 0.001f &&
-              std::abs(minV - other.minV) < 0.001f &&
-              std::abs(maxU - other.maxU) < 0.001f &&
-              std::abs(maxV - other.maxV) < 0.001f);
-    }
+    bool operator==(const SelectedTile &other) const;
   };
 
   bool IsTilePaintModeActive() const { return m_tilePaintModeActive; }
