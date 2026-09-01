@@ -375,6 +375,22 @@ Point-level coordinates, topology generation, and welding in the `Geometry` name
 - `AddFaceFromSelectedVertices()`: Builds triangles (3 points) or sorted quads (4 points).
 - `ExtrudeSelectedVertices()`, `WeldVertices()`, `DeleteSelectedVertices()`.
 
+### `TransformOperations.h`
+Centralized 3D matrix algebra, rotation conversions, vector math, and UV quantization in the `Geometry` namespace:
+- `ComputeTriangleNormal()`: 3D normal vector calculation from 3 points with degenerate fallback.
+- `NormalizedToByteUv()`, `ByteToNormalizedUv()`: Robust float $\leftrightarrow$ uint8 UV conversions.
+- `ComputeUvBounds()`: Bounding box extents for UV coordinates.
+- `InvertPolygonWinding()`: Vertex and UV winding order inversion for triangles and quads.
+- `RotatePolygonUv()`: Cyclic UV shift on polygon vertices.
+- `Matrix3x3Multiply()`, `CreateAxisAngleMatrix()`, `TransformPointAroundPivot()`.
+- `RescaleEngineToViewport()`, `RescaleViewportToEngine()`, `ConvertRotationMatrixToEuler()`, `ConvertEulerToRotationMatrix()`, `RotateMatrixExternal()`.
+
+### `GeometryCommon.h`
+Shared utility functions across geometry manipulation routines:
+- `GetWorkspaceDir()`: Resolves active workspace directory with overlay and project fallbacks.
+- `FindFloorHeightBelow()`: Downward raycasting across all chunk models to detect walkable ground.
+- `RecalculateObjectBounds()`: Recalculates object-level 3D AABB bounds across all meshes.
+
 ### `SubdivideFace.h`
 - `SubdivideSelectedFaces()`: Subdivides selected polygon faces into grid-aligned tiles while enforcing the 255-vertex budget.
 

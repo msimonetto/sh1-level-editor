@@ -8,6 +8,82 @@
 
 namespace Geometry {
 
+// 3D Vector & Normal utilities
+Vector3 ComputeTriangleNormal(Vector3 v0, Vector3 v1, Vector3 v2, Vector3 fallback) {
+    Vector3 e1 = { v1.x - v0.x, v1.y - v0.y, v1.z - v0.z };
+    Vector3 e2 = { v2.x - v0.x, v2.y - v0.y, v2.z - v0.z };
+    Vector3 cross = {
+        e1.y * e2.z - e1.z * e2.y,
+        e1.z * e2.x - e1.x * e2.z,
+        e1.x * e2.y - e1.y * e2.x
+    };
+    float lenSq = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
+    if (lenSq < 1e-8f) return fallback;
+    float invLen = 1.0f / sqrtf(lenSq);
+    return { cross.x * invLen, cross.y * invLen, cross.z * invLen };
+}
+
+// UV & Polygon utilities
+uint8_t NormalizedToByteUv(float uv) {
+    return (uint8_t)std::clamp((int)std::lroundf(uv * 255.0f), 0, 255);
+}
+
+float ByteToNormalizedUv(uint8_t raw) {
+    return (float)raw * (1.0f / 255.0f);
+}
+
+void ComputeUvBounds(const float uv[4][2], int numVerts, float& minU, float& maxU, float& minV, float& maxV) {
+    minU = 9999.0f; maxU = -9999.0f;
+    minV = 9999.0f; maxV = -9999.0f;
+    for (int i = 0; i < numVerts; ++i) {
+        minU = std::min(minU, uv[i][0]);
+        maxU = std::max(maxU, uv[i][0]);
+        minV = std::min(minV, uv[i][1]);
+        maxV = std::max(maxV, uv[i][1]);
+    }
+}
+
+void InvertPolygonWinding(uint8_t v[4], float uv[4][2], uint8_t rawU[4], uint8_t rawV[4]) {
+    bool isQuad = (v[3] != 0xFF);
+    if (isQuad) {
+        std::swap(v[1], v[3]);
+        std::swap(uv[1][0], uv[3][0]);
+        std::swap(uv[1][1], uv[3][1]);
+        std::swap(rawU[1], rawU[3]);
+        std::swap(rawV[1], rawV[3]);
+    } else {
+        std::swap(v[0], v[2]);
+        std::swap(uv[0][0], uv[2][0]);
+        std::swap(uv[0][1], uv[2][1]);
+        std::swap(rawU[0], rawU[2]);
+        std::swap(rawV[0], rawV[2]);
+    }
+}
+
+void RotatePolygonUv(float uv[4][2], uint8_t rawU[4], uint8_t rawV[4], int numVerts, int steps) {
+    if (numVerts < 3) return;
+    int actualSteps = steps % numVerts;
+    if (actualSteps < 0) actualSteps += numVerts;
+
+    for (int s = 0; s < actualSteps; ++s) {
+        float lastU = uv[numVerts - 1][0];
+        float lastV = uv[numVerts - 1][1];
+        uint8_t lastRawU = rawU[numVerts - 1];
+        uint8_t lastRawV = rawV[numVerts - 1];
+
+        for (int i = numVerts - 1; i > 0; --i) {
+            uv[i][0] = uv[i - 1][0];
+            uv[i][1] = uv[i - 1][1];
+            rawU[i] = rawU[i - 1];
+            rawV[i] = rawV[i - 1];
+        }
+        uv[0][0] = lastU;
+        uv[0][1] = lastV;
+        rawU[0] = lastRawU;
+        rawV[0] = lastRawV;
+    }
+}
+
 // Matrix algebra utilities
 void Matrix3x3Multiply(const float a[3][3], const float b[3][3], float out[3][3]) {
     float res[3][3] = {};

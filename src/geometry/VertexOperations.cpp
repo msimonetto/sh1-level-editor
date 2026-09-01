@@ -1,5 +1,7 @@
 #include "geometry/VertexOperations.h"
 #include "geometry/MeshOperations.h"
+#include "geometry/TransformOperations.h"
+#include "geometry/GeometryCommon.h"
 #include "viewport/LocalGeometryOverlay.h"
 #include "core/History.h"
 #include "formats/IPDWrite.h"
@@ -16,62 +18,12 @@
 
 namespace Geometry {
 
-static std::string GetWorkspaceDir(const LocalGeometryOverlay& overlay) {
-    if (std::filesystem::exists(overlay.m_lastWorkspaceDir))
-        return overlay.m_lastWorkspaceDir;
-    if (std::filesystem::exists("data/workspace"))
-        return "data/workspace";
-    if (std::filesystem::exists("../data/workspace"))
-        return "../data/workspace";
-    return overlay.m_lastWorkspaceDir;
-}
-
 static std::set<SelectedVertex> GetEffectiveSelectedVertices(const LocalGeometryOverlay& overlay) {
     std::set<SelectedVertex> result = overlay.m_selectedVertices;
     if (result.empty() && overlay.m_selectedVertexIdx >= 0 && !overlay.m_selectedChunk.empty() && overlay.m_selectedObjectIdx >= 0) {
         result.insert({overlay.m_selectedChunk, overlay.m_selectedObjectIdx, overlay.m_selectedMeshIdx >= 0 ? overlay.m_selectedMeshIdx : 0, overlay.m_selectedVertexIdx});
     }
     return result;
-}
-
-static float FindFloorHeightBelow(const LocalGeometryOverlay& overlay, float worldX, float worldZ, float startY, const std::string& ignoreChunk, int ignoreObjIdx) {
-    float highestFloorY = -99999.0f;
-    Ray ray;
-    ray.position = { worldX, startY + 5.0f, worldZ };
-    ray.direction = { 0.0f, -1.0f, 0.0f };
-
-    for (const auto& lc : overlay.GetChunks()) {
-        if (!lc.visible || lc.hasError) continue;
-        for (size_t oi = 0; oi < lc.data->objects.size(); ++oi) {
-            if (lc.data->chunkName == ignoreChunk && (int)oi == ignoreObjIdx)
-                continue;
-
-            const auto& obj = lc.data->objects[oi];
-            if (worldX < obj.bounds.min.x - 0.2f || worldX > obj.bounds.max.x + 0.2f ||
-                worldZ < obj.bounds.min.z - 0.2f || worldZ > obj.bounds.max.z + 0.2f)
-                continue;
-
-            for (const auto& mesh : obj.meshes) {
-                for (const auto& face : mesh.faces) {
-                    bool isQuad = (face.v[3] != 0xFF);
-                    int triCount = isQuad ? 2 : 1;
-                    static const int triV[2][3] = {{0, 1, 2}, {0, 2, 3}};
-
-                    for (int t = 0; t < triCount; ++t) {
-                        Vector3 v1 = {mesh.vx[face.v[triV[t][0]]], mesh.vy[face.v[triV[t][0]]], mesh.vz[face.v[triV[t][0]]]};
-                        Vector3 v2 = {mesh.vx[face.v[triV[t][1]]], mesh.vy[face.v[triV[t][1]]], mesh.vz[face.v[triV[t][1]]]};
-                        Vector3 v3 = {mesh.vx[face.v[triV[t][2]]], mesh.vy[face.v[triV[t][2]]], mesh.vz[face.v[triV[t][2]]]};
-
-                        RayCollision hit = GetRayCollisionTriangle(ray, v1, v2, v3);
-                        if (hit.hit && hit.point.y <= startY + 0.1f && hit.point.y > highestFloorY) {
-                            highestFloorY = hit.point.y;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return highestFloorY;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,8 +322,7 @@ bool AddFaceFromSelectedVertices(LocalGeometryOverlay& overlay, History* history
             Vector3 v0 = { mesh.vx[vertIndices[0]], mesh.vy[vertIndices[0]], mesh.vz[vertIndices[0]] };
             Vector3 v1 = { mesh.vx[vertIndices[1]], mesh.vy[vertIndices[1]], mesh.vz[vertIndices[1]] };
             Vector3 v2 = { mesh.vx[vertIndices[2]], mesh.vy[vertIndices[2]], mesh.vz[vertIndices[2]] };
-            Vector3 norm = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(v1, v0), Vector3Subtract(v2, v0)));
-            if (Vector3Length(norm) < 0.001f) norm = { 0.0f, 1.0f, 0.0f };
+            Vector3 norm = ComputeTriangleNormal(v0, v1, v2);
 
             Vector3 axisU = Vector3Normalize(Vector3Subtract(v0, center));
             if (Vector3Length(axisU) < 0.001f) axisU = { 1.0f, 0.0f, 0.0f };
@@ -516,11 +467,7 @@ bool ExtrudeSelectedVertices(LocalGeometryOverlay& overlay, Vector3 offset, Hist
                 Vector3 p2 = { mesh.vx[v2], mesh.vy[v2], mesh.vz[v2] };
                 Vector3 p3 = { mesh.vx[v3], mesh.vy[v3], mesh.vz[v3] };
 
-                Vector3 e1 = Vector3Subtract(p1, p0);
-                Vector3 e2 = Vector3Subtract(p2, p0);
-                Vector3 norm = Vector3Normalize(Vector3CrossProduct(e1, e2));
-                if (Vector3Length(norm) < 0.001f) norm = { 0.0f, 1.0f, 0.0f };
-
+                Vector3 norm = ComputeTriangleNormal(p0, p1, p2);
                 Vector3 finalOffset = Vector3Scale(norm, step);
 
                 uint8_t nv0 = (uint8_t)mesh.vx.size();

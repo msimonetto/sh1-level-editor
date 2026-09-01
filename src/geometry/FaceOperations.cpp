@@ -1,5 +1,7 @@
 #include "geometry/FaceOperations.h"
 #include "geometry/MeshOperations.h"
+#include "geometry/TransformOperations.h"
+#include "geometry/GeometryCommon.h"
 #include "viewport/LocalGeometryOverlay.h"
 #include "panels/TextureMapPanel.h"
 #include "core/History.h"
@@ -15,16 +17,6 @@
 #include <vector>
 
 namespace Geometry {
-
-static std::string GetWorkspaceDir(const LocalGeometryOverlay& overlay) {
-    if (std::filesystem::exists(overlay.m_lastWorkspaceDir))
-        return overlay.m_lastWorkspaceDir;
-    if (std::filesystem::exists("data/workspace"))
-        return "data/workspace";
-    if (std::filesystem::exists("../data/workspace"))
-        return "../data/workspace";
-    return overlay.m_lastWorkspaceDir;
-}
 
 static std::set<SelectedFace> GetEffectiveSelectedFaces(const LocalGeometryOverlay& overlay) {
     std::set<SelectedFace> result = overlay.m_selectedFaces;
@@ -320,11 +312,7 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                 Vector3 v0 = { mesh.vx[origFace.v[0]], mesh.vy[origFace.v[0]], mesh.vz[origFace.v[0]] };
                 Vector3 v1 = { mesh.vx[origFace.v[1]], mesh.vy[origFace.v[1]], mesh.vz[origFace.v[1]] };
                 Vector3 v2 = { mesh.vx[origFace.v[2]], mesh.vy[origFace.v[2]], mesh.vz[origFace.v[2]] };
-                Vector3 e1 = Vector3Subtract(v1, v0);
-                Vector3 e2 = Vector3Subtract(v2, v0);
-                Vector3 norm = Vector3Normalize(Vector3CrossProduct(e1, e2));
-                if (Vector3Length(norm) < 0.001f) norm = { 0.0f, 1.0f, 0.0f };
-
+                Vector3 norm = ComputeTriangleNormal(v0, v1, v2);
                 Vector3 offset = Vector3Scale(norm, distance);
 
                 // Create new extruded vertices
@@ -348,21 +336,11 @@ bool ExtrudeFaces(LocalGeometryOverlay& overlay, float distance, int mode, Histo
                 uint8_t minRawU = 0, maxRawU = 255, minRawV = 0, maxRawV = 255;
 
                 if (hasTexture) {
-                    minU = origFace.uv[0][0]; maxU = origFace.uv[0][0];
-                    minV = origFace.uv[0][1]; maxV = origFace.uv[0][1];
-                    minRawU = origFace.rawU[0]; maxRawU = origFace.rawU[0];
-                    minRawV = origFace.rawV[0]; maxRawV = origFace.rawV[0];
-
-                    for (int k = 1; k < numV; ++k) {
-                        minU = std::min(minU, origFace.uv[k][0]);
-                        maxU = std::max(maxU, origFace.uv[k][0]);
-                        minV = std::min(minV, origFace.uv[k][1]);
-                        maxV = std::max(maxV, origFace.uv[k][1]);
-                        minRawU = std::min(minRawU, origFace.rawU[k]);
-                        maxRawU = std::max(maxRawU, origFace.rawU[k]);
-                        minRawV = std::min(minRawV, origFace.rawV[k]);
-                        maxRawV = std::max(maxRawV, origFace.rawV[k]);
-                    }
+                    ComputeUvBounds(origFace.uv, numV, minU, maxU, minV, maxV);
+                    minRawU = NormalizedToByteUv(minU);
+                    maxRawU = NormalizedToByteUv(maxU);
+                    minRawV = NormalizedToByteUv(minV);
+                    maxRawV = NormalizedToByteUv(maxV);
                 }
 
                 // If mode 0: create side quad faces (outward facing)
@@ -492,20 +470,7 @@ bool InvertNormals(LocalGeometryOverlay& overlay, History* history) {
             for (int fIdx : faceIndices) {
                 if (fIdx < 0 || fIdx >= (int)mesh.faces.size()) continue;
                 auto& face = mesh.faces[fIdx];
-                bool isQuad = (face.v[3] != 0xFF);
-                if (isQuad) {
-                    std::swap(face.v[1], face.v[3]);
-                    std::swap(face.uv[1][0], face.uv[3][0]);
-                    std::swap(face.uv[1][1], face.uv[3][1]);
-                    std::swap(face.rawU[1], face.rawU[3]);
-                    std::swap(face.rawV[1], face.rawV[3]);
-                } else {
-                    std::swap(face.v[0], face.v[2]);
-                    std::swap(face.uv[0][0], face.uv[2][0]);
-                    std::swap(face.uv[0][1], face.uv[2][1]);
-                    std::swap(face.rawU[0], face.rawU[2]);
-                    std::swap(face.rawV[0], face.rawV[2]);
-                }
+                InvertPolygonWinding(face.v, face.uv, face.rawU, face.rawV);
                 face.isDirty = true;
                 changed = true;
             }
@@ -704,20 +669,13 @@ bool PaintFaces(LocalGeometryOverlay& overlay, History* history) {
                     face.uv[2][0] = maxU; face.uv[2][1] = maxV;
                 }
 
-                for (int r = 0; r < currentTile.rotationSteps; ++r) {
-                    float lastU = face.uv[numVerts-1][0];
-                    float lastV = face.uv[numVerts-1][1];
-                    for (int i = numVerts - 1; i > 0; --i) {
-                        face.uv[i][0] = face.uv[i-1][0];
-                        face.uv[i][1] = face.uv[i-1][1];
-                    }
-                    face.uv[0][0] = lastU;
-                    face.uv[0][1] = lastV;
+                for (int i = 0; i < numVerts; ++i) {
+                    face.rawU[i] = NormalizedToByteUv(face.uv[i][0]);
+                    face.rawV[i] = NormalizedToByteUv(face.uv[i][1]);
                 }
 
-                for (int i = 0; i < numVerts; ++i) {
-                    face.rawU[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][0] * 255.0f), 0, 255);
-                    face.rawV[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][1] * 255.0f), 0, 255);
+                if (currentTile.rotationSteps > 0) {
+                    RotatePolygonUv(face.uv, face.rawU, face.rawV, numVerts, currentTile.rotationSteps);
                 }
 
                 face.isDirty = true;
@@ -854,23 +812,7 @@ bool RotateUV(LocalGeometryOverlay& overlay, int steps, History* history) {
                 auto& face = mesh.faces[fIdx];
                 int numV = (face.v[3] != 0xFF) ? 4 : 3;
 
-                for (int s = 0; s < steps; ++s) {
-                    float lastU = face.uv[numV - 1][0];
-                    float lastV = face.uv[numV - 1][1];
-                    uint8_t lastRawU = face.rawU[numV - 1];
-                    uint8_t lastRawV = face.rawV[numV - 1];
-
-                    for (int i = numV - 1; i > 0; --i) {
-                        face.uv[i][0] = face.uv[i - 1][0];
-                        face.uv[i][1] = face.uv[i - 1][1];
-                        face.rawU[i] = face.rawU[i - 1];
-                        face.rawV[i] = face.rawV[i - 1];
-                    }
-                    face.uv[0][0] = lastU;
-                    face.uv[0][1] = lastV;
-                    face.rawU[0] = lastRawU;
-                    face.rawV[0] = lastRawV;
-                }
+                RotatePolygonUv(face.uv, face.rawU, face.rawV, numV, steps);
                 face.isDirty = true;
                 changed = true;
             }
@@ -937,21 +879,17 @@ bool FlipUV(LocalGeometryOverlay& overlay, bool horizontal, bool vertical, Histo
                 auto& face = mesh.faces[fIdx];
                 int numV = (face.v[3] != 0xFF) ? 4 : 3;
 
-                float minU = 9999.0f, maxU = -9999.0f;
-                float minV = 9999.0f, maxV = -9999.0f;
-                for (int i = 0; i < numV; ++i) {
-                    minU = std::min(minU, face.uv[i][0]); maxU = std::max(maxU, face.uv[i][0]);
-                    minV = std::min(minV, face.uv[i][1]); maxV = std::max(maxV, face.uv[i][1]);
-                }
+                float minU, maxU, minV, maxV;
+                ComputeUvBounds(face.uv, numV, minU, maxU, minV, maxV);
 
                 for (int i = 0; i < numV; ++i) {
                     if (horizontal) {
                         face.uv[i][0] = minU + maxU - face.uv[i][0];
-                        face.rawU[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][0] * 255.0f), 0, 255);
+                        face.rawU[i] = NormalizedToByteUv(face.uv[i][0]);
                     }
                     if (vertical) {
                         face.uv[i][1] = minV + maxV - face.uv[i][1];
-                        face.rawV[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][1] * 255.0f), 0, 255);
+                        face.rawV[i] = NormalizedToByteUv(face.uv[i][1]);
                     }
                 }
                 face.isDirty = true;
@@ -1020,12 +958,8 @@ bool FitUVToTileBounds(LocalGeometryOverlay& overlay, History* history) {
                 auto& face = mesh.faces[fIdx];
                 int numV = (face.v[3] != 0xFF) ? 4 : 3;
 
-                float minU = 9999.0f, maxU = -9999.0f;
-                float minV = 9999.0f, maxV = -9999.0f;
-                for (int i = 0; i < numV; ++i) {
-                    minU = std::min(minU, face.uv[i][0]); maxU = std::max(maxU, face.uv[i][0]);
-                    minV = std::min(minV, face.uv[i][1]); maxV = std::max(maxV, face.uv[i][1]);
-                }
+                float minU, maxU, minV, maxV;
+                ComputeUvBounds(face.uv, numV, minU, maxU, minV, maxV);
 
                 float rangeU = maxU - minU;
                 float rangeV = maxV - minV;
@@ -1035,8 +969,8 @@ bool FitUVToTileBounds(LocalGeometryOverlay& overlay, History* history) {
                 for (int i = 0; i < numV; ++i) {
                     face.uv[i][0] = (face.uv[i][0] - minU) / rangeU;
                     face.uv[i][1] = (face.uv[i][1] - minV) / rangeV;
-                    face.rawU[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][0] * 255.0f), 0, 255);
-                    face.rawV[i] = (uint8_t)std::clamp((int)std::lroundf(face.uv[i][1] * 255.0f), 0, 255);
+                    face.rawU[i] = NormalizedToByteUv(face.uv[i][0]);
+                    face.rawV[i] = NormalizedToByteUv(face.uv[i][1]);
                 }
                 face.isDirty = true;
                 changed = true;
