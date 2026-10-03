@@ -1,17 +1,27 @@
-# SH1 Level Editor <img src="./res/SHLE256.png" align="right" width="128px" height="128px" style="float: right; margin-left: 10px;" />
+# Silent Hill Level Editor (Prototype) <img src="./res/SHLE256.png" align="right" width="128px" height="128px" style="float: right; margin-left: 10px;" />
 
 > [!NOTE]
-> **This project is in very early development!** Most features have not yet been implemented and serious level editing is not recommended at this stage.
+> This is an AI-assisted prototype of my other repo (currently under [sh1-level-editor-rewrite](https://github.com/msimonetto/sh1-level-editor-rewrite)) that is being written more gradually and accurately. This program has some utility in that it has processed and modified valid chunk/map data correctly (as pictured below), but there were several inaccuracies in its binary layouts and the overall codebase was difficult to maintain.
 
-A C++ 3D geometry and level workstation for PlayStation 1 *Silent Hill* (1999) and its [unofficial PC Decompilation Port](https://github.com/SlickAmogus/silent-hill-decomp). Reproducibly converts proprietary binary formats (`.IPD`, `.PLM`, `.TIM`) **forwards and backwards!**
+A C++ 3D geometry and level workstation for PlayStation 1 *Silent Hill* (1999) and its [unofficial PC Decompilation Port](https://github.com/SlickAmogus/silent-hill-decomp). Reproducibly converts proprietary binary formats (`.IPD`, `.PLM`, `.TIM`) **forwards and backwards**. Suggests some extensions to some binary layouts and naming, but more carefully investigated in my other [repo](https://github.com/msimonetto/sh1-level-editor-rewrite).
 
 ![Demonstration](./docs/images/Demonstration.png)
 
 Proprietary chunk formats (`.IPD`, `.PLM`) have been **successfully mapped out** and are **convertible** through either the dedicated ImGui editor or the included Python scripting (which requires revision). This project developed from [the game's ongoing decompilation project](https://github.com/shdecompilations/silent-hill-decomp) for known binary data structures and an [earlier conversion tool](https://github.com/belek666/sh_ipd2obj) from chunk `.IPD` to Wavefront `.OBJ` files. It initially aimed to convert chunk data to-and-from JSONs while simultaneously minimising the uninterpretable raw binary sections, but it emerged into an editor/validator written in C++ to allow for more dynamic movement of structs and direct in-memory editing. Most core functionality has been introduced (asset management, geometry/texture editors), but validators are missing and the stability of the workflow has not been tested thoroughly.
 
-Further testing and rewrites of AI-assisted code is ongoing. AI has been used for early prototyping, research and a majority of the editor, but this will gradually be rewritten without AI assistance over time.
+Further testing and rewriting of AI-assisted code is ongoing. AI has been used for early prototyping, research and a majority of the renderer/geometry manipulation.
 
 **Applications**: As of August 2026, the decompilation project is mostly complete, but what is missing is full annotation and migration of binary overlay map data. 3D visualisation offered by the program may allow for cross-referencing between the binary layout and in-game points, as with camera occlusion walls or event handling in the PC Port. Setting aliases to chunks and visualising door connections may be of use as well.
+
+---
+
+## Current Status
+
+- **Likely will not be developed further**: This has achieved its role as a prototype of what will be developed more carefully at [sh1-level-editor-rewrite](https://github.com/msimonetto/sh1-level-editor-rewrite) (will be renamed in near future).
+- **Unimplemented level design features**: Some of the level design elements haven't been implemented yet as of August 2026, but the core geometry (`.IPD`, `.PLM`), textures (`.TIM`) and chunk-specific collision (`.IPD`) are visualised correctly. The source code is modular enough to allow for easy future extension, allowing for discrete panels to be added.
+- **Unimplemented PSX support and binary overlay editing**: Only the PC Port has been integrated so far. No disc-image support currently exists, but this can be implemented relatively easily. For the PC Port, most of the engine patches (file table updates, waypoint data) are centered around replacing C source files (and indirectly DLLs) and regenerating a full PSX disc image takes several minutes. Conversion cycle back into binary overlays, alongside an alternate deployment routine would likely be necessary. Disc image checksums are virtually guaranteed to change after modification such that the [Silent Hill Map Examiner](https://github.com/ItEndsWithTens/SilentHillMapExaminer) plugin won't recognise the game as Silent Hill anymore.
+- **Unimplemented Linux or macOS support**: Currently only built around Windows due to the PC Port.
+- **Use of legacy Python scripts**: A small number of Python scripts are used, preventing the program from being exclusively contained as one executable and fully written in C++. The provided legacy Python scripts are outdated and miss certain conversion elements that the C++ editor does.
 
 ---
 
@@ -27,15 +37,6 @@ Further testing and rewrites of AI-assisted code is ongoing. AI has been used fo
 - **Texture Edit**: Minimally implemented 2D pixel editor for TIM files, will allow conversions to-and-from PNGs soon. 
 - **Maps**: Currently minimal but editable, works in tandem with Waypoints viewport mode.
 - File management is automated based on chunk and prefix selection.
-
----
-
-## Current Status
-
-- **Unimplemented level design features**: Some of the level design elements haven't been implemented yet as of August 2026, but the core geometry (`.IPD`, `.PLM`), textures (`.TIM`) and chunk-specific collision (`.IPD`) are visualised correctly. The source code is modular enough to allow for easy future extension, allowing for discrete panels to be added.
-- **Unimplemented PSX support and binary overlay editing**: Only the PC Port has been integrated so far. No disc-image support currently exists, but this can be implemented relatively easily. For the PC Port, most of the engine patches (file table updates, waypoint data) are centered around replacing C source files (and indirectly DLLs) and regenerating a full PSX disc image takes several minutes. Conversion cycle back into binary overlays, alongside an alternate deployment routine would likely be necessary. Disc image checksums are virtually guaranteed to change after modification such that the [Silent Hill Map Examiner](https://github.com/ItEndsWithTens/SilentHillMapExaminer) plugin won't recognise the game as Silent Hill anymore.
-- **Unimplemented Linux or macOS support**: Currently only built around Windows due to the PC Port.
-- **Use of legacy Python scripts**: A small number of Python scripts are used, preventing the program from being exclusively contained as one executable and fully written in C++. The provided legacy Python scripts are outdated and miss certain conversion elements that the C++ editor does.
 
 ---
 
@@ -82,12 +83,6 @@ To playtest your level edits directly in the [PC Port](https://github.com/SlickA
    In the editor's menu bar under **Edit >> Settings** (or via `config.json`):
    - **Project Directory:** Set to `data/` (or your preferred workspace path containing `workspace/` and `assets/`).
    - **Game Directory:** Set to `game/` (points to `game/PC` and its override directory for deploying level edits).
-
----
-
-## Contributing
-
-Contributions are welcomed. Some project guidelines are outlined in [`CONTRIBUTING.md`](CONTRIBUTING.md). The project itself aims to be modular/abstracted to allow for simultaneous development of new panels.
 
 ---
 
